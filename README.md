@@ -13,7 +13,7 @@ Requirements:
 - Claude Code/Desktop and/or Codex
 
 ```sh
-git clone <repository-url> ronaldinho-pet
+git clone https://github.com/felipefrf/ronaldinho-pet.git
 cd ronaldinho-pet
 ./install.sh
 ```
@@ -81,7 +81,10 @@ installs twice, uninstalls, and checks that unknown hooks and settings survive.
 - Clicking Ronaldinho focuses the exact originating application. In the expanded
   match center, each host row is independently clickable. Exact terminal tabs are
   not exposed by host hooks, so focus stops at the application.
-- Do not publish the bundled sprite asset until its redistribution rights and
-  license have been confirmed.
+
+## License
+
+The code is available under the [MIT License](LICENSE). The bundled Ronaldinho
+sprite is redistributed with permission; see [ASSET_NOTICE.md](ASSET_NOTICE.md).
 
 See [EXECUTION_PLAN.md](EXECUTION_PLAN.md) for the reviewed implementation plan.

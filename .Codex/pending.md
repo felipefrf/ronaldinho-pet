@@ -1,4 +1,5 @@
-- [ ] Confirmar o direito de redistribuir `spritesheet.webp` e definir as licenças do código e do asset — bloqueia publicar o repositório no GitHub; próximo passo: registrar a origem/autorização do sprite antes do primeiro push público.
+- [x] Confirmar o direito de redistribuir `spritesheet.webp` — autorização direta do dono do repositório confirmada pelo usuário; origem e escopo documentados em `ASSET_NOTICE.md`.
+- [x] Renovar a autenticação do GitHub CLI — login confirmado como `felipefrf` antes da publicação.
 - [x] Unificar a experiência visual entre companion e pet nativo — hoje são dois renderizadores com animações/tamanhos independentes. Implementar painel multi-host e documentar o controle nativo do Codex.
 - [x] Dar visibilidade contínua a Claude e Codex — substituir o status único por fonte, sessões ativas e conclusões pendentes, com reconhecimento individual.
 - [x] Adicionar tamanho persistente ao companion — oferecer Small/Medium/Large no menu sem afetar o tamanho configurado no Codex App.
