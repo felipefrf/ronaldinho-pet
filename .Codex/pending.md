@@ -1,0 +1,1 @@
+- [ ] Confirmar o direito de redistribuir `spritesheet.webp` e definir as licenças do código e do asset — bloqueia publicar o repositório no GitHub; próximo passo: registrar a origem/autorização do sprite antes do primeiro push público.

@@ -1,17 +1,9 @@
 import Cocoa
 
-private struct CompanionState: Decodable {
-    let state: String?
-    let message: String?
-    let terminalBundleID: String?
-    let showNonce: String?
-    let unread: Bool?
-}
-
 private final class PetView: NSView {
     private let cellWidth: CGFloat = 192
     private let cellHeight: CGFloat = 208
-    private let stateFileURL: URL
+    private let stateRootURL: URL
     private let spriteSheet: NSImage?
     private let animationSpecs: [String: (row: Int, frames: Int)] = [
         "idle": (0, 7),
@@ -34,7 +26,7 @@ private final class PetView: NSView {
     private var interactionState: String?
     private var statusMessage: String?
     private var terminalBundleID: String?
-    private var showNonce: String?
+    private var displayedSnapshot: PetSnapshot?
     private var statusExpanded = false
     private var statusUnread = false
     private var trackingArea: NSTrackingArea?
@@ -43,20 +35,20 @@ private final class PetView: NSView {
     private let activateClaudeSession: (String?) -> Bool
     private let showCompanion: () -> Void
     private let setStatusPanelExpanded: (Bool) -> Void
-    private let acknowledgeStatus: () -> Void
+    private let acknowledgeStatus: (PetSnapshot) -> Void
 
     override var isFlipped: Bool { true }
 
     init(
         frame: NSRect,
         spriteSheetURL: URL?,
-        stateFileURL: URL,
+        stateRootURL: URL,
         activateClaudeSession: @escaping (String?) -> Bool,
         showCompanion: @escaping () -> Void,
         setStatusPanelExpanded: @escaping (Bool) -> Void,
-        acknowledgeStatus: @escaping () -> Void
+        acknowledgeStatus: @escaping (PetSnapshot) -> Void
     ) {
-        self.stateFileURL = stateFileURL
+        self.stateRootURL = stateRootURL
         self.spriteSheet = spriteSheetURL.flatMap(NSImage.init(contentsOf:))
         self.activateClaudeSession = activateClaudeSession
         self.showCompanion = showCompanion
@@ -113,12 +105,15 @@ private final class PetView: NSView {
     }
 
     private func readState() {
-        guard
-            let data = try? Data(contentsOf: stateFileURL),
-            let decoded = try? JSONDecoder().decode(CompanionState.self, from: data)
-        else { return }
+        guard let display = PetStore.display(
+            from: PetStore.snapshots(root: stateRootURL),
+            root: stateRootURL,
+            now: Int64(Date().timeIntervalSince1970 * 1_000)
+        ) else { return }
+        let decoded = display.snapshot
+        displayedSnapshot = decoded
 
-        let nextState = normalizedState(decoded.state)
+        let nextState = normalizedState(decoded.state == "completed" || decoded.state == "ended" || decoded.state == "stale" ? "idle" : decoded.state)
         if nextState != state {
             state = nextState
             if interactionState == nil {
@@ -132,18 +127,12 @@ private final class PetView: NSView {
             needsDisplay = true
         }
 
-        if decoded.message != statusMessage || decoded.terminalBundleID != terminalBundleID || (decoded.unread ?? false) != statusUnread {
-            statusMessage = decoded.message
-            terminalBundleID = decoded.terminalBundleID
-            statusUnread = decoded.unread ?? false
+        let message = display.pendingCount > 1 ? "\(decoded.message) · \(display.pendingCount) pending" : decoded.message
+        if message != statusMessage || decoded.applicationBundleID != terminalBundleID || decoded.unread != statusUnread {
+            statusMessage = message
+            terminalBundleID = decoded.applicationBundleID
+            statusUnread = decoded.unread
             needsDisplay = true
-        }
-
-        if decoded.showNonce != showNonce {
-            showNonce = decoded.showNonce
-            if let showNonce, !showNonce.isEmpty {
-                showCompanion()
-            }
         }
     }
 
@@ -168,9 +157,9 @@ private final class PetView: NSView {
     }
 
     private func acknowledgeUnreadStatus() {
-        guard statusUnread else { return }
+        guard statusUnread, let displayedSnapshot else { return }
         statusUnread = false
-        acknowledgeStatus()
+        acknowledgeStatus(displayedSnapshot)
         needsDisplay = true
     }
 
@@ -368,13 +357,11 @@ private final class PetView: NSView {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let companionDirectory = URL(fileURLWithPath: NSHomeDirectory())
-        .appendingPathComponent(".claude/ronaldinho-pet", isDirectory: true)
+    private let companionDirectory = PetStore.rootURL()
     private var panel: NSPanel?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let spriteSheetURL = Bundle.main.url(forResource: "spritesheet", withExtension: "webp")
-        let stateFileURL = companionDirectory.appendingPathComponent("state.json")
         let rect = initialFrame()
         let panel = NSPanel(
             contentRect: rect,
@@ -391,7 +378,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.contentView = PetView(
             frame: NSRect(origin: .zero, size: rect.size),
             spriteSheetURL: spriteSheetURL,
-            stateFileURL: stateFileURL,
+            stateRootURL: companionDirectory,
             activateClaudeSession: { [weak self] bundleID in
                 self?.activateClaudeTerminal(bundleID: bundleID) ?? false
             },
@@ -401,8 +388,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             setStatusPanelExpanded: { [weak self] expanded in
                 self?.setStatusPanelExpanded(expanded)
             },
-            acknowledgeStatus: { [weak self] in
-                self?.acknowledgeStatus()
+            acknowledgeStatus: { [weak self] snapshot in
+                self?.acknowledgeStatus(snapshot)
             }
         )
         panel.orderFrontRegardless()
@@ -453,9 +440,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.setFrame(frame, display: true, animate: true)
     }
 
-    private func acknowledgeStatus() {
+    private func acknowledgeStatus(_ snapshot: PetSnapshot) {
         let process = Process()
-        process.executableURL = companionDirectory.appendingPathComponent("acknowledge-state.sh")
+        process.executableURL = Bundle.main.url(forResource: "RonaldinhoPetState", withExtension: nil)
+        process.arguments = ["ack", snapshot.source, snapshot.sessionID, String(snapshot.turn), snapshot.eventID]
+        process.environment = ProcessInfo.processInfo.environment
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         try? process.run()
