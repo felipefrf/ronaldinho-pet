@@ -94,6 +94,7 @@ rm -rf "$TARGET_APP"
 ditto "$STAGE/build/RonaldinhoPet.app" "$TARGET_APP"
 cp "$SOURCE/show-pet.sh" "$TARGET_ROOT/show-pet.sh"
 chmod +x "$TARGET_ROOT/show-pet.sh"
+/usr/bin/xattr -dr com.apple.quarantine "$TARGET_ROOT" 2>/dev/null || true
 "$STAGE/configure-hooks" "$TARGET_ROOT" claude install
 "$STAGE/configure-hooks" "$TARGET_ROOT" codex install
 mkdir -p "$CODEX_PET"

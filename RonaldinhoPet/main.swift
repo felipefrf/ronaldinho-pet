@@ -437,13 +437,11 @@ private final class PetView: NSView {
     }
 
     override func scrollWheel(with event: NSEvent) {
-        let viewLocation = convert(event.locationInWindow, from: nil)
-        guard petRect.contains(viewLocation), event.scrollingDeltaY != 0 else {
+        guard event.scrollingDeltaY != 0 else {
             super.scrollWheel(with: event)
             return
         }
-        let sensitivity: CGFloat = event.hasPreciseScrollingDeltas ? 0.0025 : 0.025
-        adjustPetScale(max(-0.08, min(0.08, event.scrollingDeltaY * sensitivity)))
+        adjustPetScale(max(-0.10, min(0.10, event.scrollingDeltaY * 0.01)))
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -511,6 +509,7 @@ private final class PetView: NSView {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let companionDirectory = PetStore.rootURL()
     private var panel: NSPanel?
+    private var globalScrollMonitor: Any?
     private var petScale: CGFloat {
         let stored = UserDefaults.standard.double(forKey: "petScale")
         return stored == 0 ? 0.60 : CGFloat(stored)
@@ -550,6 +549,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         panel.orderFrontRegardless()
         self.panel = panel
+        globalScrollMonitor = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self, weak panel] event in
+            guard let self, let panel, panel.frame.contains(NSEvent.mouseLocation), event.scrollingDeltaY != 0 else { return }
+            self.setPetScale(self.petScale + max(-0.10, min(0.10, event.scrollingDeltaY * 0.01)))
+        }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        if let globalScrollMonitor { NSEvent.removeMonitor(globalScrollMonitor) }
     }
 
     private func activateSession(bundleID: String) -> Bool {

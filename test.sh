@@ -68,6 +68,11 @@ mkdir -p "$INSTALL_ROOT/RonaldinhoPet.app/Contents/Resources"
 cp "$HELPER" "$INSTALL_ROOT/RonaldinhoPet.app/Contents/Resources/RonaldinhoPetState"
 cp "$ROOT/RonaldinhoPet/show-pet.sh" "$INSTALL_ROOT/show-pet.sh"
 "$TEST_ROOT/configure-hooks" "$INSTALL_ROOT" claude install >/dev/null
+grep -q '/usr/bin/open -a' "$RONALDINHO_CONFIG_HOME/.claude/commands/pet.md"
+if grep -q 'show-pet.sh' "$RONALDINHO_CONFIG_HOME/.claude/commands/pet.md"; then
+  echo "Claude /pet still executes the quarantinable wrapper." >&2
+  exit 1
+fi
 FIRST_HASH="$(shasum -a 256 "$RONALDINHO_CONFIG_HOME/.claude/settings.json")"
 "$TEST_ROOT/configure-hooks" "$INSTALL_ROOT" claude install >/dev/null
 test "$FIRST_HASH" = "$(shasum -a 256 "$RONALDINHO_CONFIG_HOME/.claude/settings.json")"

@@ -50,7 +50,7 @@ guard ["install", "remove"].contains(mode) else { fail("Mode must be install or 
 
 let root = URL(fileURLWithPath: arguments[1], isDirectory: true).standardizedFileURL
 let helper = root.appendingPathComponent("RonaldinhoPet.app/Contents/Resources/RonaldinhoPetState").path
-let show = root.appendingPathComponent("show-pet.sh").path
+let app = root.appendingPathComponent("RonaldinhoPet.app").path
 let ingest = "\(shellQuote(helper)) ingest \(host)"
 
 let environment = ProcessInfo.processInfo.environment
@@ -105,10 +105,12 @@ settings["hooks"] = hooks
 let petCommand = """
 ---
 description: Show the Ronaldinho companion pet.
-allowed-tools: Bash(\(show))
+allowed-tools: Bash(/usr/bin/open:*)
 ---
 
-!`\(shellQuote(show))`
+!`/usr/bin/open -a \(shellQuote(app))`
+
+Ronaldinho companion is ready.
 """
 
 do {

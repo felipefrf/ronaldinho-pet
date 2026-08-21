@@ -4,3 +4,5 @@
 - [x] Dar visibilidade contínua a Claude e Codex — substituir o status único por fonte, sessões ativas e conclusões pendentes, com reconhecimento individual.
 - [x] Adicionar tamanho persistente ao companion — oferecer Small/Medium/Large no menu sem afetar o tamanho configurado no Codex App.
 - [x] Diferenciar conclusão real de espera por sub-agentes — um `Stop` com `background_tasks` ativos não pode gerar “Finished”; manter como execução delegada e reconhecer alertas quando o terminal ganhar foco.
+- [x] Fazer o tamanho responder ao scroll na janela não-ativável — observar o scroll global apenas enquanto o cursor estiver sobre o companion e persistir a escala.
+- [x] Corrigir `/pet` bloqueado pelo macOS — deixar o comando Claude usar `open` diretamente e remover `quarantine` somente dos artefatos instalados.
