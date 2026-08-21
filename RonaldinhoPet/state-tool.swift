@@ -39,21 +39,26 @@ private func withLock<T>(at lockURL: URL, body: () throws -> T) throws -> T {
     throw NSError(domain: "RonaldinhoPet", code: 1, userInfo: [NSLocalizedDescriptionKey: "Timed out waiting for session lock"])
 }
 
-private func stateAndMessage(event: String, input: [String: Any], previous: PetSnapshot?) -> (String, String)? {
+private func stateAndMessage(source: String, event: String, input: [String: Any], previous: PetSnapshot?) -> (String, String)? {
+    let name = source == "codex" ? "Codex" : "Claude"
     switch event {
-    case "SessionStart": return ("idle", "Ready")
-    case "UserPromptSubmit": return ("running", "Claude is thinking…")
+    case "SessionStart": return ("idle", "\(name) is ready")
+    case "UserPromptSubmit": return ("running", "\(name) is thinking…")
     case "PreToolUse", "PostToolUse", "PostToolUseFailure", "PostToolBatch":
         if let previous, ["completed", "failed", "ended"].contains(previous.state) { return nil }
-        return ("running", "Claude is working…")
-    case "PermissionRequest", "Elicitation": return ("waiting", "Claude needs your input")
+        return ("running", "\(name) is working…")
+    case "PermissionRequest", "Elicitation": return ("waiting", "\(name) needs your input")
     case "Notification":
         let type = string(input, "notification_type") ?? ""
         guard ["permission_prompt", "idle_prompt", "agent_needs_input"].contains(type) else { return nil }
-        return ("waiting", "Claude needs your input")
-    case "Stop": return ("completed", "Claude finished")
-    case "StopFailure": return ("failed", "Claude stopped with an error")
-    case "SessionEnd": return ("ended", "Session ended")
+        return ("waiting", "\(name) needs your input")
+    case "Stop":
+        if let tasks = input["background_tasks"] as? [Any], !tasks.isEmpty {
+            return ("running", "\(name) is waiting for agents…")
+        }
+        return ("completed", "\(name) finished")
+    case "StopFailure": return ("failed", "\(name) stopped with an error")
+    case "SessionEnd": return ("ended", "\(name) session ended")
     default: return nil
     }
 }
@@ -73,7 +78,7 @@ private func ingest(source: String) {
     do {
         try withLock(at: lock) {
             let previous = PetStore.readSnapshot(at: url)
-            guard let (state, message) = stateAndMessage(event: event, input: input, previous: previous) else { return }
+            guard let (state, message) = stateAndMessage(source: source, event: event, input: input, previous: previous) else { return }
             let now = Int64(Date().timeIntervalSince1970 * 1_000)
             let turn = event == "UserPromptSubmit" ? (previous?.turn ?? 0) + 1 : (previous?.turn ?? 0)
             let eventID = ["completed", "failed"].contains(state)

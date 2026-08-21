@@ -27,6 +27,7 @@ private final class PetView: NSView {
     private var statusMessage: String?
     private var terminalBundleID: String?
     private var displayedSnapshot: PetSnapshot?
+    private var recentSnapshots: [PetSnapshot] = []
     private var statusExpanded = false
     private var statusUnread = false
     private var trackingArea: NSTrackingArea?
@@ -86,16 +87,18 @@ private final class PetView: NSView {
     }
 
     private var statusAreaHeight: CGFloat {
-        statusExpanded ? 36 : 18
+        statusExpanded ? 62 : 26
     }
 
     private var petRect: NSRect {
-        NSRect(x: 0, y: 0, width: bounds.width, height: max(0, bounds.height - statusAreaHeight))
+        let height = max(0, bounds.height - statusAreaHeight)
+        let width = min(bounds.width, height * 240 / 260)
+        return NSRect(x: (bounds.width - width) / 2, y: 0, width: width, height: height)
     }
 
     private var statusControlRect: NSRect {
-        let height: CGFloat = statusExpanded ? 26 : 10
-        let width: CGFloat = statusExpanded ? bounds.width - 38 : 42
+        let height: CGFloat = statusExpanded ? 54 : 20
+        let width: CGFloat = statusExpanded ? min(bounds.width - 36, 204) : bounds.width - 16
         return NSRect(
             x: (bounds.width - width) / 2,
             y: petRect.maxY + (statusAreaHeight - height) / 2,
@@ -111,7 +114,14 @@ private final class PetView: NSView {
             now: Int64(Date().timeIntervalSince1970 * 1_000)
         ) else { return }
         let decoded = display.snapshot
+        let terminalIsFrontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier == decoded.applicationBundleID
+        if decoded.unread && terminalIsFrontmost {
+            acknowledgeStatus(decoded)
+        }
         displayedSnapshot = decoded
+        recentSnapshots = PetStore.snapshots(root: stateRootURL)
+            .filter { $0.state != "ended" }
+            .sorted { $0.receivedAt > $1.receivedAt }
 
         let nextState = normalizedState(decoded.state == "completed" || decoded.state == "ended" || decoded.state == "stale" ? "idle" : decoded.state)
         if nextState != state {
@@ -127,13 +137,47 @@ private final class PetView: NSView {
             needsDisplay = true
         }
 
-        let message = display.pendingCount > 1 ? "\(decoded.message) · \(display.pendingCount) pending" : decoded.message
-        if message != statusMessage || decoded.applicationBundleID != terminalBundleID || decoded.unread != statusUnread {
+        let message = "Claude: \(hostStatus("claude", compact: true)) · Codex: \(hostStatus("codex", compact: true))"
+        let unread = decoded.unread && !terminalIsFrontmost
+        if message != statusMessage || decoded.applicationBundleID != terminalBundleID || unread != statusUnread {
             statusMessage = message
             terminalBundleID = decoded.applicationBundleID
-            statusUnread = decoded.unread
+            statusUnread = unread
             needsDisplay = true
         }
+    }
+
+    private func hostStatus(_ source: String, compact: Bool) -> String {
+        let snapshots = recentSnapshots.filter { $0.source == source }
+        guard !snapshots.isEmpty else { return compact ? "—" : "no signal" }
+        func priority(_ snapshot: PetSnapshot) -> Int {
+            let unread = snapshot.unread && !PetStore.isAcknowledged(snapshot, root: stateRootURL)
+            switch snapshot.state {
+            case "waiting": return 7
+            case "failed": return unread ? 6 : 2
+            case "completed": return unread ? 5 : 1
+            case "running": return 4
+            case "stale": return 3
+            default: return 0
+            }
+        }
+        let selected = snapshots.max {
+            let left = priority($0)
+            let right = priority($1)
+            return left == right ? $0.receivedAt < $1.receivedAt : left < right
+        }!
+        let acknowledged = PetStore.isAcknowledged(selected, root: stateRootURL)
+        let count = snapshots.filter { $0.state == selected.state }.count
+        let label: String
+        switch selected.state {
+        case "running": label = selected.message.contains("waiting for agents") ? (compact ? "agents" : "waiting for agents") : "working"
+        case "waiting": label = compact ? "input" : "needs input"
+        case "completed": label = acknowledged ? (compact ? "done ✓" : "finished ✓") : (compact ? "done" : "finished")
+        case "failed": label = acknowledged ? "failed ✓" : "failed"
+        case "stale": label = "unknown"
+        default: label = "idle"
+        }
+        return count > 1 && ["running", "completed"].contains(selected.state) ? "\(label) \(count)" : label
     }
 
     private func advanceFrame() {
@@ -199,18 +243,6 @@ private final class PetView: NSView {
         let badgePath = NSBezierPath(roundedRect: badgeRect, xRadius: badgeRect.height / 2, yRadius: badgeRect.height / 2)
         let tint = statusTint()
 
-        if !statusExpanded {
-            let tuckedFill = state == "idle" && !statusUnread
-                ? NSColor.white.withAlphaComponent(0.14)
-                : tint.withAlphaComponent(0.82)
-            tuckedFill.setFill()
-            badgePath.fill()
-            NSColor.white.withAlphaComponent(state == "idle" && !statusUnread ? 0.18 : 0.35).setStroke()
-            badgePath.lineWidth = 1
-            badgePath.stroke()
-            return
-        }
-
         NSColor.white.withAlphaComponent(0.74).setFill()
         badgePath.fill()
         tint.withAlphaComponent(0.20).setFill()
@@ -219,12 +251,16 @@ private final class PetView: NSView {
         badgePath.lineWidth = 1
         badgePath.stroke()
 
-        let dotRect = NSRect(x: badgeRect.minX + 10, y: badgeRect.midY - 3.5, width: 7, height: 7)
+        let headerY = statusExpanded ? badgeRect.minY + 7 : badgeRect.midY - 3.5
+        let dotRect = NSRect(x: badgeRect.minX + 10, y: headerY, width: 7, height: 7)
         tint.setFill()
         NSBezierPath(ovalIn: dotRect).fill()
 
         let message: String
-        if let statusMessage, !statusMessage.isEmpty {
+        if statusExpanded {
+            let active = recentSnapshots.filter { ["running", "waiting"].contains($0.state) }.count
+            message = active == 0 ? "All seen" : "\(active) active"
+        } else if let statusMessage, !statusMessage.isEmpty {
             message = statusMessage
         } else {
             message = defaultStatusMessage()
@@ -237,7 +273,22 @@ private final class PetView: NSView {
             .font: NSFont.systemFont(ofSize: 10.5, weight: .semibold),
             .paragraphStyle: paragraphStyle,
         ]
-        message.draw(in: NSRect(x: dotRect.maxX + 6, y: badgeRect.minY + 6, width: badgeRect.maxX - dotRect.maxX - 16, height: 14), withAttributes: attributes)
+        message.draw(in: NSRect(x: dotRect.maxX + 6, y: headerY - 3, width: badgeRect.maxX - dotRect.maxX - 16, height: 14), withAttributes: attributes)
+
+        if statusExpanded {
+            for (index, source) in ["claude", "codex"].enumerated() {
+                let name = source == "codex" ? "Codex" : "Claude"
+                let row = "\(name)  ·  \(hostStatus(source, compact: false))"
+                let rowAttributes: [NSAttributedString.Key: Any] = [
+                    .foregroundColor: NSColor.black.withAlphaComponent(0.72),
+                    .font: NSFont.systemFont(ofSize: 10, weight: .medium),
+                ]
+                row.draw(
+                    in: NSRect(x: badgeRect.minX + 14, y: badgeRect.minY + 24 + CGFloat(index * 15), width: badgeRect.width - 28, height: 14),
+                    withAttributes: rowAttributes
+                )
+            }
+        }
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -349,6 +400,17 @@ private final class PetView: NSView {
         let menu = NSMenu()
         let resetItem = menu.addItem(withTitle: "Reset position", action: #selector(AppDelegate.resetPosition), keyEquivalent: "")
         resetItem.target = NSApp.delegate as? AppDelegate
+        let sizeMenu = NSMenu()
+        for (title, action) in [
+            ("Small", #selector(AppDelegate.useSmallSize)),
+            ("Medium", #selector(AppDelegate.useMediumSize)),
+            ("Large", #selector(AppDelegate.useLargeSize)),
+        ] {
+            let item = sizeMenu.addItem(withTitle: title, action: action, keyEquivalent: "")
+            item.target = NSApp.delegate as? AppDelegate
+        }
+        let sizeItem = menu.addItem(withTitle: "Pet size", action: nil, keyEquivalent: "")
+        menu.setSubmenu(sizeMenu, for: sizeItem)
         menu.addItem(.separator())
         let quitItem = menu.addItem(withTitle: "Quit Ronaldinho companion", action: #selector(AppDelegate.quit), keyEquivalent: "q")
         quitItem.target = NSApp.delegate as? AppDelegate
@@ -359,6 +421,10 @@ private final class PetView: NSView {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let companionDirectory = PetStore.rootURL()
     private var panel: NSPanel?
+    private var petScale: CGFloat {
+        let stored = UserDefaults.standard.double(forKey: "petScale")
+        return stored == 0 ? 0.60 : CGFloat(stored)
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let spriteSheetURL = Bundle.main.url(forResource: "spritesheet", withExtension: "webp")
@@ -437,6 +503,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         var frame = panel.frame
         frame.size.height = targetHeight
         frame.origin.y = topEdge - targetHeight
+        if let screen = NSScreen.screens.first(where: { $0.frame.intersects(panel.frame) }) {
+            frame.origin.y = max(frame.origin.y, screen.visibleFrame.minY + 8)
+        }
         panel.setFrame(frame, display: true, animate: true)
     }
 
@@ -455,7 +524,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func panelSize(statusExpanded: Bool) -> NSSize {
-        NSSize(width: 240, height: statusExpanded ? 296 : 278)
+        NSSize(width: 240, height: 260 * petScale + (statusExpanded ? 62 : 26))
     }
 
     private func initialFrame(on preferredScreen: NSScreen? = nil, statusExpanded: Bool = false) -> NSRect {
@@ -471,6 +540,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let expanded = panel.map { $0.frame.height > panelSize(statusExpanded: false).height } ?? false
         panel?.setFrame(initialFrame(statusExpanded: expanded), display: true, animate: true)
     }
+
+    private func setPetScale(_ scale: CGFloat) {
+        guard let panel else { return }
+        let expanded = panel.frame.height > 260 * petScale + 26
+        UserDefaults.standard.set(Double(scale), forKey: "petScale")
+        let topRight = NSPoint(x: panel.frame.maxX, y: panel.frame.maxY)
+        var frame = panel.frame
+        frame.size = panelSize(statusExpanded: expanded)
+        frame.origin = NSPoint(x: topRight.x - frame.width, y: topRight.y - frame.height)
+        panel.setFrame(frame, display: true, animate: true)
+    }
+
+    @objc func useSmallSize() { setPetScale(0.60) }
+    @objc func useMediumSize() { setPetScale(0.80) }
+    @objc func useLargeSize() { setPetScale(1.0) }
 
     @objc func quit() {
         NSApp.terminate(nil)

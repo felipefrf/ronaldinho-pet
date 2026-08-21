@@ -21,6 +21,16 @@ cd ronaldinho-pet
 Restart Claude and Codex after installation. In Codex App, open
 **Settings → Pets → Refresh** to select the native Ronaldinho pet.
 
+There are two intentional surfaces using the same sprite asset:
+
+- the Codex App native pet lives inside Codex and its size is controlled under
+  **Settings → Pets → Appearance → Pet size**;
+- the floating companion combines Claude and Codex activity. Right-click it and
+  choose **Pet size → Small / Medium / Large**. This choice is persisted.
+
+The compact bar always shows Claude and Codex independently, including active
+and finished counts. Click it to expand the fixed row for each host.
+
 The installer:
 
 - builds locally for the current Mac;

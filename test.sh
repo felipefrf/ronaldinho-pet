@@ -21,13 +21,20 @@ done
 "$HELPER" inspect claude fixture-session | grep -q '"state":"completed"'
 "$HELPER" inspect claude fixture-session | grep -q '"turn":1'
 
+# A main agent waiting on delegated work has not finished.
+printf '%s\n' '{"session_id":"delegated","hook_event_name":"UserPromptSubmit"}' | "$HELPER" ingest claude
+printf '%s\n' '{"session_id":"delegated","hook_event_name":"Stop","background_tasks":[{"agent_id":"worker-1"}]}' | "$HELPER" ingest claude
+"$HELPER" inspect claude delegated | grep -q '"state":"running"'
+"$HELPER" inspect claude delegated | grep -q 'waiting for agents'
+
 # Activity arriving after Stop cannot reopen the completed turn.
 printf '%s\n' '{"session_id":"fixture-session","hook_event_name":"PostToolUse"}' | "$HELPER" ingest claude
 "$HELPER" inspect claude fixture-session | grep -q '"state":"completed"'
 
 # The same session id from another source gets another file.
 printf '%s\n' '{"session_id":"fixture-session","hook_event_name":"UserPromptSubmit"}' | "$HELPER" ingest codex
-test "$(find "$RONALDINHO_PET_ROOT/sessions" -type f -name '*.json' | wc -l | tr -d ' ')" = 2
+test "$(find "$RONALDINHO_PET_ROOT/sessions" -type f -name '*.json' | wc -l | tr -d ' ')" = 3
+"$HELPER" inspect codex fixture-session | grep -q 'Codex is thinking'
 
 # Concurrent updates remain valid JSON under the per-session lock.
 printf '%s\n' '{"session_id":"concurrent","hook_event_name":"UserPromptSubmit"}' | "$HELPER" ingest claude
@@ -35,7 +42,7 @@ for _ in {1..100}; do
   printf '%s\n' '{"session_id":"concurrent","hook_event_name":"PostToolUse"}' | "$HELPER" ingest claude &
 done
 wait
-test "$("$HELPER" validate)" = 3
+test "$("$HELPER" validate)" = 4
 
 SDK_PATH="$(xcrun --show-sdk-path)"
 SDK_VERSION="$(xcrun --show-sdk-version)"

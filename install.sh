@@ -80,6 +80,7 @@ if [ -e "$CLAUDE_COMMAND" ]; then cp -p "$CLAUDE_COMMAND" "$STAGE/pet.md"; fi
 if [ -e "$CODEX_HOOKS" ]; then cp -p "$CODEX_HOOKS" "$STAGE/hooks.json"; fi
 if [ -e "$CODEX_PET" ]; then ditto "$CODEX_PET" "$STAGE/previous-codex-pet"; fi
 
+pkill -f "$TARGET_APP/Contents/MacOS/RonaldinhoPet" 2>/dev/null || true
 mkdir -p "$TARGET_ROOT"
 rm -rf "$TARGET_APP"
 ditto "$STAGE/build/RonaldinhoPet.app" "$TARGET_APP"

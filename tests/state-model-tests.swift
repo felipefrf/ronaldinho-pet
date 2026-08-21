@@ -25,6 +25,14 @@ private struct StateModelTests {
 
         let failed = snapshot(source: "claude", session: "failed", state: "failed", unread: true, time: 30)
         precondition(PetStore.display(from: values + [failed], root: root, now: 30)!.snapshot.sessionID == "wait")
+
+        let withoutWaiting = values.filter { $0.sessionID != "wait" }
+        precondition(PetStore.display(from: withoutWaiting, root: root, now: 30)!.snapshot.sessionID == "done")
+        try PetStore.write(
+            PetAcknowledgement(schemaVersion: 1, source: "claude", sessionID: "done", turn: 1, eventID: "claude-done-completed"),
+            to: PetStore.acknowledgementURL(root: root, source: "claude", sessionID: "done")
+        )
+        precondition(PetStore.display(from: withoutWaiting, root: root, now: 30)!.snapshot.sessionID == "run")
         print("state model tests passed")
     }
 }

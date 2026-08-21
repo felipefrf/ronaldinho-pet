@@ -110,10 +110,19 @@ enum PetStore {
             return value
         }
         let pendingCount = values.filter { ["completed", "failed"].contains($0.state) && $0.unread }.count
-        let priority = ["waiting": 5, "failed": 4, "running": 3, "completed": 2, "stale": 1, "idle": 0, "ended": 0]
+        func priority(_ value: PetSnapshot) -> Int {
+            switch value.state {
+            case "waiting": return 7
+            case "failed": return value.unread ? 6 : 2
+            case "completed": return value.unread ? 5 : 1
+            case "running": return 4
+            case "stale": return 3
+            default: return 0
+            }
+        }
         guard let selected = values.max(by: {
-            let left = priority[$0.state] ?? -1
-            let right = priority[$1.state] ?? -1
+            let left = priority($0)
+            let right = priority($1)
             return left == right ? $0.receivedAt < $1.receivedAt : left < right
         }) else { return nil }
         return PetDisplay(snapshot: selected, pendingCount: pendingCount)

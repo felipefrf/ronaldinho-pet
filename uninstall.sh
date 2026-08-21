@@ -14,6 +14,7 @@ swiftc -sdk "$SDK_PATH" -target "$(uname -m)-apple-macosx${SDK_VERSION}" \
 "$CONFIGURATOR" "$TARGET_ROOT" codex remove
 
 if [ -d "$TARGET_ROOT" ]; then
+  pkill -f "$TARGET_ROOT/RonaldinhoPet.app/Contents/MacOS/RonaldinhoPet" 2>/dev/null || true
   mkdir -p "${HOME}/.Trash"
   mv "$TARGET_ROOT" "${HOME}/.Trash/RonaldinhoPet-$(date +%Y%m%d-%H%M%S)"
   echo "Moved the app and local state to Trash."
