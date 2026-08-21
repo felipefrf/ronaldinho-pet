@@ -37,13 +37,19 @@ test "$(find "$RONALDINHO_PET_ROOT/sessions" -type f -name '*.json' | wc -l | tr
 "$HELPER" inspect codex fixture-session | grep -q 'Codex is thinking'
 "$HELPER" inspect codex fixture-session | grep -q '"applicationBundleID":"com.openai.codex"'
 
+# Codex may auto-review a permission request; it is not user input yet.
+printf '%s\n' '{"session_id":"codex-auto-approval","hook_event_name":"UserPromptSubmit"}' | "$HELPER" ingest codex
+printf '%s\n' '{"session_id":"codex-auto-approval","hook_event_name":"PermissionRequest"}' | "$HELPER" ingest codex
+"$HELPER" inspect codex codex-auto-approval | grep -q '"state":"running"'
+"$HELPER" inspect codex codex-auto-approval | grep -q 'checking permission'
+
 # Concurrent updates remain valid JSON under the per-session lock.
 printf '%s\n' '{"session_id":"concurrent","hook_event_name":"UserPromptSubmit"}' | "$HELPER" ingest claude
 for _ in {1..100}; do
   printf '%s\n' '{"session_id":"concurrent","hook_event_name":"PostToolUse"}' | "$HELPER" ingest claude &
 done
 wait
-test "$("$HELPER" validate)" = 4
+test "$("$HELPER" validate)" = 5
 
 SDK_PATH="$(xcrun --show-sdk-path)"
 SDK_VERSION="$(xcrun --show-sdk-version)"

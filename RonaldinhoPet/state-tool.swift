@@ -49,7 +49,13 @@ private func stateAndMessage(source: String, event: String, input: [String: Any]
     case "PreToolUse", "PostToolUse", "PostToolUseFailure", "PostToolBatch":
         if let previous, ["completed", "failed", "ended"].contains(previous.state) { return nil }
         return ("running", "\(name) is working…")
-    case "PermissionRequest", "Elicitation": return ("waiting", "\(name) needs your input")
+    case "PermissionRequest":
+        if source == "codex" {
+            if let previous, ["completed", "failed", "ended"].contains(previous.state) { return nil }
+            return ("running", "Codex is checking permission…")
+        }
+        return ("waiting", "Claude needs your input")
+    case "Elicitation": return ("waiting", "\(name) needs your input")
     case "Notification":
         let type = string(input, "notification_type") ?? ""
         guard ["permission_prompt", "idle_prompt", "agent_needs_input"].contains(type) else { return nil }

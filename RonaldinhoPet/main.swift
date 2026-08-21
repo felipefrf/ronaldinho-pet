@@ -33,7 +33,7 @@ private final class PetView: NSView {
     private var animationTimer: Timer?
     private var stateTimer: Timer?
     private let activateSession: (String) -> Bool
-    private let showCompanion: () -> Void
+    private let adjustPetScale: (CGFloat) -> Void
     private let setStatusPanelExpanded: (Bool) -> Void
     private let acknowledgeStatus: (PetSnapshot) -> Void
 
@@ -44,14 +44,14 @@ private final class PetView: NSView {
         spriteSheetURL: URL?,
         stateRootURL: URL,
         activateSession: @escaping (String) -> Bool,
-        showCompanion: @escaping () -> Void,
+        adjustPetScale: @escaping (CGFloat) -> Void,
         setStatusPanelExpanded: @escaping (Bool) -> Void,
         acknowledgeStatus: @escaping (PetSnapshot) -> Void
     ) {
         self.stateRootURL = stateRootURL
         self.spriteSheet = spriteSheetURL.flatMap(NSImage.init(contentsOf:))
         self.activateSession = activateSession
-        self.showCompanion = showCompanion
+        self.adjustPetScale = adjustPetScale
         self.setStatusPanelExpanded = setStatusPanelExpanded
         self.acknowledgeStatus = acknowledgeStatus
         super.init(frame: frame)
@@ -436,6 +436,16 @@ private final class PetView: NSView {
         window.setFrameOrigin(origin)
     }
 
+    override func scrollWheel(with event: NSEvent) {
+        let viewLocation = convert(event.locationInWindow, from: nil)
+        guard petRect.contains(viewLocation), event.scrollingDeltaY != 0 else {
+            super.scrollWheel(with: event)
+            return
+        }
+        let sensitivity: CGFloat = event.hasPreciseScrollingDeltas ? 0.0025 : 0.025
+        adjustPetScale(max(-0.08, min(0.08, event.scrollingDeltaY * sensitivity)))
+    }
+
     override func mouseUp(with event: NSEvent) {
         guard isDragging else { return }
         isDragging = false
@@ -528,8 +538,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             activateSession: { [weak self] bundleID in
                 self?.activateSession(bundleID: bundleID) ?? false
             },
-            showCompanion: { [weak self] in
-                self?.showCompanion()
+            adjustPetScale: { [weak self] delta in
+                self?.setPetScale((self?.petScale ?? 0.35) + delta)
             },
             setStatusPanelExpanded: { [weak self] expanded in
                 self?.setStatusPanelExpanded(expanded)
@@ -547,18 +557,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             $0.bundleIdentifier == bundleID && !$0.isTerminated
         }) else { return false }
         return application.activate(options: [])
-    }
-
-    private func showCompanion() {
-        guard let panel else { return }
-        if let screen = screenForMouse(), !screen.visibleFrame.intersects(panel.frame) {
-            panel.setFrame(
-                initialFrame(on: screen, statusExpanded: panel.frame.height > panelSize(statusExpanded: false).height),
-                display: true,
-                animate: false
-            )
-        }
-        panel.orderFrontRegardless()
     }
 
     private func setStatusPanelExpanded(_ expanded: Bool) {
@@ -609,6 +607,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setPetScale(_ scale: CGFloat) {
         guard let panel else { return }
+        let scale = min(1.20, max(0.25, scale))
         let expanded = panel.frame.height > 260 * petScale + 26
         UserDefaults.standard.set(Double(scale), forKey: "petScale")
         let topRight = NSPoint(x: panel.frame.maxX, y: panel.frame.maxY)
@@ -618,7 +617,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.setFrame(frame, display: true, animate: true)
     }
 
-    @objc func useSmallSize() { setPetScale(0.60) }
+    @objc func useSmallSize() { setPetScale(0.35) }
     @objc func useMediumSize() { setPetScale(0.80) }
     @objc func useLargeSize() { setPetScale(1.0) }
 
