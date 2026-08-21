@@ -18,8 +18,9 @@ cd ronaldinho-pet
 ./install.sh
 ```
 
-Restart Claude and Codex after installation. In Codex App, open
-**Settings → Pets → Refresh** to select the native Ronaldinho pet.
+In Codex CLI, run `/hooks`, review the commands ending in
+`RonaldinhoPetState ingest codex`, and trust them. Then restart Claude and Codex.
+In Codex App, open **Settings → Pets → Refresh** to select the native pet.
 
 There are two intentional surfaces using the same sprite asset:
 

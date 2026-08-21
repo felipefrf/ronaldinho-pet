@@ -98,5 +98,6 @@ if [ "${RONALDINHO_SKIP_LAUNCH:-false}" != true ]; then
   open -a "$TARGET_APP" || echo "Installed, but macOS did not launch the pet. Open $TARGET_APP manually." >&2
 fi
 
-echo "Ronaldinho Pet installed. Restart Claude and Codex so they reload hooks."
+echo "Ronaldinho Pet installed. In Codex CLI, run /hooks and trust the RonaldinhoPetState commands."
+echo "Then restart Claude and Codex so they reload the trusted hooks."
 echo "In Codex App, open Settings → Pets → Refresh to select the native pet."
