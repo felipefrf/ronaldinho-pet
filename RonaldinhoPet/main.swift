@@ -577,7 +577,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let screen = NSScreen.screens.first(where: { $0.frame.intersects(panel.frame) }) {
             frame.origin.y = max(frame.origin.y, screen.visibleFrame.minY + 8)
         }
-        panel.setFrame(frame, display: true, animate: true)
+        panel.setFrame(frame, display: true, animate: false)
     }
 
     private func acknowledgeStatus(_ snapshot: PetSnapshot) {
@@ -609,7 +609,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func resetPosition() {
         let expanded = panel.map { $0.frame.height > panelSize(statusExpanded: false).height } ?? false
-        panel?.setFrame(initialFrame(statusExpanded: expanded), display: true, animate: true)
+        panel?.setFrame(initialFrame(statusExpanded: expanded), display: true, animate: false)
     }
 
     private func setPetScale(_ scale: CGFloat) {
@@ -621,7 +621,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         var frame = panel.frame
         frame.size = panelSize(statusExpanded: expanded)
         frame.origin = NSPoint(x: topRight.x - frame.width, y: topRight.y - frame.height)
-        panel.setFrame(frame, display: true, animate: true)
+        panel.setFrame(frame, display: true, animate: false)
     }
 
     @objc func useSmallSize() { setPetScale(0.35) }
