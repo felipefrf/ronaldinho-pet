@@ -16,6 +16,8 @@ private final class PetView: NSView {
         "running": (7, 6),
         "review": (8, 6),
     ]
+    private let scoreboardBackground = NSColor(calibratedRed: 0.035, green: 0.10, blue: 0.065, alpha: 0.96)
+    private let scoreboardAccent = NSColor(calibratedRed: 0.98, green: 0.83, blue: 0.08, alpha: 0.82)
 
     private var state = "idle"
     private var frameIndex = 0
@@ -277,11 +279,9 @@ private final class PetView: NSView {
 
         let badgePath = NSBezierPath(roundedRect: badgeRect, xRadius: badgeRect.height / 2, yRadius: badgeRect.height / 2)
         let tint = statusTint()
-        NSColor.white.withAlphaComponent(0.74).setFill()
+        scoreboardBackground.setFill()
         badgePath.fill()
-        tint.withAlphaComponent(0.20).setFill()
-        badgePath.fill()
-        NSColor.white.withAlphaComponent(0.80).setStroke()
+        scoreboardAccent.setStroke()
         badgePath.lineWidth = 1
         badgePath.stroke()
 
@@ -300,7 +300,7 @@ private final class PetView: NSView {
         paragraphStyle.alignment = .center
         paragraphStyle.lineBreakMode = .byTruncatingTail
         let attributes: [NSAttributedString.Key: Any] = [
-            .foregroundColor: NSColor.black.withAlphaComponent(0.82),
+            .foregroundColor: NSColor.white.withAlphaComponent(0.92),
             .font: NSFont.systemFont(ofSize: 10.5, weight: .semibold),
             .paragraphStyle: paragraphStyle,
         ]
@@ -309,9 +309,9 @@ private final class PetView: NSView {
 
     private func drawScoreboard(in rect: NSRect) {
         let board = NSBezierPath(roundedRect: rect, xRadius: 12, yRadius: 12)
-        NSColor(calibratedRed: 0.035, green: 0.10, blue: 0.065, alpha: 0.96).setFill()
+        scoreboardBackground.setFill()
         board.fill()
-        NSColor(calibratedRed: 0.98, green: 0.83, blue: 0.08, alpha: 0.82).setStroke()
+        scoreboardAccent.setStroke()
         board.lineWidth = 1
         board.stroke()
 
