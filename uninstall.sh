@@ -4,13 +4,20 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 TARGET_ROOT="${HOME}/Library/Application Support/RonaldinhoPet"
 CODEX_SKILL="${CODEX_HOME:-${HOME}/.codex}/skills/ronaldinho-pet"
-CONFIGURATOR="$(mktemp "${TMPDIR:-/tmp}/ronaldinho-configure.XXXXXX")"
-trap 'rm -f "$CONFIGURATOR"' EXIT
-
-SDK_PATH="$(xcrun --show-sdk-path)"
-SDK_VERSION="$(xcrun --show-sdk-version)"
-swiftc -sdk "$SDK_PATH" -target "$(uname -m)-apple-macosx${SDK_VERSION}" \
-  "$ROOT/RonaldinhoPet/configure-hooks.swift" -o "$CONFIGURATOR"
+TEMP_CONFIGURATOR=""
+if [ -x "$ROOT/configure-hooks" ]; then
+  CONFIGURATOR="$ROOT/configure-hooks"
+elif [ -x "$ROOT/prebuilt/configure-hooks" ]; then
+  CONFIGURATOR="$ROOT/prebuilt/configure-hooks"
+else
+  TEMP_CONFIGURATOR="$(mktemp "${TMPDIR:-/tmp}/ronaldinho-configure.XXXXXX")"
+  CONFIGURATOR="$TEMP_CONFIGURATOR"
+  SDK_PATH="$(xcrun --show-sdk-path)"
+  CLANG_MODULE_CACHE_PATH="$(mktemp -d "${TMPDIR:-/tmp}/ronaldinho-module-cache.XXXXXX")"
+  swiftc -sdk "$SDK_PATH" -target "$(uname -m)-apple-macosx${RONALDINHO_DEPLOYMENT_TARGET:-$(xcrun --show-sdk-version)}" -module-cache-path "$CLANG_MODULE_CACHE_PATH" \
+    "$ROOT/RonaldinhoPet/configure-hooks.swift" -o "$CONFIGURATOR"
+fi
+trap 'if [ -n "$TEMP_CONFIGURATOR" ]; then rm -f "$TEMP_CONFIGURATOR"; rm -rf "$CLANG_MODULE_CACHE_PATH"; fi' EXIT
 "$CONFIGURATOR" "$TARGET_ROOT" claude remove
 "$CONFIGURATOR" "$TARGET_ROOT" codex remove
 

@@ -82,17 +82,30 @@ test "$(grep -c 'RonaldinhoPetState' "$RONALDINHO_CONFIG_HOME/.claude/settings.j
 "$TEST_ROOT/configure-hooks" "$INSTALL_ROOT" codex install >/dev/null
 test "$(grep -c 'RonaldinhoPetState' "$RONALDINHO_CONFIG_HOME/.codex/hooks.json")" = 9
 
+# A prebuilt release installs without invoking the source build.
+PREBUILT_ROOT="$TEST_ROOT/prebuilt"
+PREBUILT_HOME="$TEST_ROOT/prebuilt home"
+mkdir -p "$PREBUILT_ROOT" "$PREBUILT_HOME/.claude" "$PREBUILT_HOME/.codex"
+ditto "$RONALDINHO_BUILD_ROOT/RonaldinhoPet.app" "$PREBUILT_ROOT/RonaldinhoPet.app"
+cp "$TEST_ROOT/configure-hooks" "$PREBUILT_ROOT/configure-hooks"
+chmod +x "$PREBUILT_ROOT/configure-hooks"
+HOME="$PREBUILT_HOME" RONALDINHO_CONFIG_HOME="$PREBUILT_HOME" \
+  RONALDINHO_PREBUILT_ROOT="$PREBUILT_ROOT" RONALDINHO_BUILD_ROOT="$TEST_ROOT/should-not-build" \
+  RONALDINHO_SKIP_HOST_CHECK=true RONALDINHO_SKIP_LAUNCH=true zsh "$ROOT/install.sh" >/dev/null
+test -x "$PREBUILT_HOME/Library/Application Support/RonaldinhoPet/RonaldinhoPet.app/Contents/MacOS/RonaldinhoPet"
+test ! -e "$TEST_ROOT/should-not-build"
+
 # Exercise the public installer twice in an isolated home, then uninstall.
 PUBLIC_HOME="$TEST_ROOT/public home"
 mkdir -p "$PUBLIC_HOME/.claude" "$PUBLIC_HOME/.codex"
 printf '%s\n' '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"keep-claude"}]}]}}' > "$PUBLIC_HOME/.claude/settings.json"
 printf '%s\n' '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"keep-codex"}]}]}}' > "$PUBLIC_HOME/.codex/hooks.json"
-HOME="$PUBLIC_HOME" RONALDINHO_CONFIG_HOME="$PUBLIC_HOME" RONALDINHO_SKIP_LAUNCH=true zsh "$ROOT/install.sh" >/dev/null
+HOME="$PUBLIC_HOME" RONALDINHO_CONFIG_HOME="$PUBLIC_HOME" RONALDINHO_SKIP_HOST_CHECK=true RONALDINHO_SKIP_LAUNCH=true zsh "$ROOT/install.sh" >/dev/null
 test -f "$PUBLIC_HOME/.codex/skills/ronaldinho-pet/SKILL.md"
 grep -q 'name: ronaldinho-pet' "$PUBLIC_HOME/.codex/skills/ronaldinho-pet/SKILL.md"
 PUBLIC_HASH="$(shasum -a 256 "$PUBLIC_HOME/.claude/settings.json" "$PUBLIC_HOME/.codex/hooks.json")"
 BACKUP_COUNT="$(find "$PUBLIC_HOME" -name '*.ronaldinho-backup-*' | wc -l | tr -d ' ')"
-HOME="$PUBLIC_HOME" RONALDINHO_CONFIG_HOME="$PUBLIC_HOME" RONALDINHO_SKIP_LAUNCH=true zsh "$ROOT/install.sh" >/dev/null
+HOME="$PUBLIC_HOME" RONALDINHO_CONFIG_HOME="$PUBLIC_HOME" RONALDINHO_SKIP_HOST_CHECK=true RONALDINHO_SKIP_LAUNCH=true zsh "$ROOT/install.sh" >/dev/null
 test "$PUBLIC_HASH" = "$(shasum -a 256 "$PUBLIC_HOME/.claude/settings.json" "$PUBLIC_HOME/.codex/hooks.json")"
 test "$BACKUP_COUNT" = "$(find "$PUBLIC_HOME" -name '*.ronaldinho-backup-*' | wc -l | tr -d ' ')"
 HOME="$PUBLIC_HOME" RONALDINHO_CONFIG_HOME="$PUBLIC_HOME" zsh "$ROOT/uninstall.sh" >/dev/null

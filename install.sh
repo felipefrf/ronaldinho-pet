@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 SOURCE="$ROOT/RonaldinhoPet"
+PREBUILT_ROOT="${RONALDINHO_PREBUILT_ROOT:-$ROOT/prebuilt}"
 TARGET_ROOT="${HOME}/Library/Application Support/RonaldinhoPet"
 TARGET_APP="$TARGET_ROOT/RonaldinhoPet.app"
 CLAUDE_SETTINGS="${HOME}/.claude/settings.json"
@@ -60,26 +61,34 @@ if [ "$(uname -s)" != Darwin ]; then
   echo "Ronaldinho Pet supports macOS only." >&2
   exit 1
 fi
-if ! command -v swiftc >/dev/null 2>&1 || ! command -v xcrun >/dev/null 2>&1; then
-  echo "Xcode Command Line Tools are required. Run: xcode-select --install" >&2
-  exit 1
-fi
 if [ ! -f "$SOURCE/spritesheet.webp" ]; then
   echo "Missing spritesheet.webp." >&2
   exit 1
 fi
-if ! command -v claude >/dev/null 2>&1 && [ ! -d /Applications/Claude.app ]; then
-  echo "Install Claude Code or Claude Desktop before enabling Claude hooks." >&2
+if [ "${RONALDINHO_SKIP_HOST_CHECK:-false}" != true ] \
+  && ! command -v claude >/dev/null 2>&1 && [ ! -d /Applications/Claude.app ] \
+  && ! command -v codex >/dev/null 2>&1 && [ ! -d /Applications/ChatGPT.app ] && [ ! -d /Applications/Codex.app ]; then
+  echo "Install Claude or Codex before enabling Ronaldinho Pet." >&2
   exit 1
 fi
 
-export RONALDINHO_BUILD_ROOT="$STAGE/build"
-export CLANG_MODULE_CACHE_PATH="$STAGE/module-cache"
-zsh "$SOURCE/build-app.sh" "$SOURCE/spritesheet.webp" >/dev/null
-SDK_PATH="$(xcrun --show-sdk-path)"
-SDK_VERSION="$(xcrun --show-sdk-version)"
-swiftc -sdk "$SDK_PATH" -target "$(uname -m)-apple-macosx${SDK_VERSION}" \
-  "$SOURCE/configure-hooks.swift" -o "$STAGE/configure-hooks"
+if [ -x "$PREBUILT_ROOT/RonaldinhoPet.app/Contents/MacOS/RonaldinhoPet" ] && [ -x "$PREBUILT_ROOT/configure-hooks" ]; then
+  BUILD_APP="$PREBUILT_ROOT/RonaldinhoPet.app"
+  CONFIGURATOR="$PREBUILT_ROOT/configure-hooks"
+else
+  if ! command -v swiftc >/dev/null 2>&1 || ! command -v xcrun >/dev/null 2>&1; then
+    echo "Xcode Command Line Tools are required for a source install. Use the prebuilt release instead." >&2
+    exit 1
+  fi
+  export RONALDINHO_BUILD_ROOT="$STAGE/build"
+  export CLANG_MODULE_CACHE_PATH="$STAGE/module-cache"
+  zsh "$SOURCE/build-app.sh" "$SOURCE/spritesheet.webp" >/dev/null
+  SDK_PATH="$(xcrun --show-sdk-path)"
+  swiftc -sdk "$SDK_PATH" -target "$(uname -m)-apple-macosx${RONALDINHO_DEPLOYMENT_TARGET:-$(xcrun --show-sdk-version)}" -module-cache-path "$CLANG_MODULE_CACHE_PATH" \
+    "$SOURCE/configure-hooks.swift" -o "$STAGE/configure-hooks"
+  BUILD_APP="$STAGE/build/RonaldinhoPet.app"
+  CONFIGURATOR="$STAGE/configure-hooks"
+fi
 
 if [ -e "$TARGET_ROOT" ]; then ditto "$TARGET_ROOT" "$STAGE/previous-install"; fi
 if [ -e "$CLAUDE_SETTINGS" ]; then cp -p "$CLAUDE_SETTINGS" "$STAGE/settings.json"; fi
@@ -91,12 +100,12 @@ if [ -e "$CODEX_SKILL" ]; then ditto "$CODEX_SKILL" "$STAGE/previous-codex-skill
 pkill -f "$TARGET_APP/Contents/MacOS/RonaldinhoPet" 2>/dev/null || true
 mkdir -p "$TARGET_ROOT"
 rm -rf "$TARGET_APP"
-ditto "$STAGE/build/RonaldinhoPet.app" "$TARGET_APP"
+ditto "$BUILD_APP" "$TARGET_APP"
 cp "$SOURCE/show-pet.sh" "$TARGET_ROOT/show-pet.sh"
 chmod +x "$TARGET_ROOT/show-pet.sh"
 /usr/bin/xattr -dr com.apple.quarantine "$TARGET_ROOT" 2>/dev/null || true
-"$STAGE/configure-hooks" "$TARGET_ROOT" claude install
-"$STAGE/configure-hooks" "$TARGET_ROOT" codex install
+"$CONFIGURATOR" "$TARGET_ROOT" claude install
+"$CONFIGURATOR" "$TARGET_ROOT" codex install
 mkdir -p "$CODEX_PET"
 cp "$ROOT/codex-pet/pet.json" "$ROOT/RonaldinhoPet/spritesheet.webp" "$CODEX_PET/"
 mkdir -p "${CODEX_SKILL:h}"

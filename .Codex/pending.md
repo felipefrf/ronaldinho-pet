@@ -7,3 +7,4 @@
 - [x] Fazer o tamanho responder ao scroll na janela não-ativável — observar o scroll global apenas enquanto o cursor estiver sobre o companion e persistir a escala.
 - [x] Corrigir `/pet` bloqueado pelo macOS — deixar o comando Claude usar `open` diretamente e remover `quarantine` somente dos artefatos instalados.
 - [x] Remover duplicação visual transitória — redimensionamentos concorrentes mantinham snapshots antigos da janela; aplicar mudanças de frame sem animação.
+- [ ] Assinar e notarizar o release universal — não há identidade Developer ID no Keychain nem secrets Apple no GitHub; obter certificado/credenciais e adicionar a etapa de notarização antes do release estável.

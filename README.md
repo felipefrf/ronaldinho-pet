@@ -4,6 +4,16 @@ A small macOS companion for Claude Code, Claude Desktop, Codex CLI, and Codex
 App. It uses native hooks and keeps one state file per session, so concurrent
 terminals do not overwrite each other.
 
+## Install on macOS
+
+Download the newest `macos-universal.dmg` from
+[Releases](https://github.com/felipefrf/ronaldinho-pet/releases), open it, and
+double-click **Install Ronaldinho Pet**. The prebuilt release works on Apple
+Silicon and Intel Macs running macOS 13 or newer; Xcode is not required.
+
+Until the app has a Developer ID signature, macOS may require **right-click →
+Open** the first time.
+
 ## Install from source
 
 Requirements:
@@ -35,7 +45,7 @@ and finished counts. Click it to expand the fixed row for each host.
 
 The installer:
 
-- builds locally for the current Mac;
+- uses the universal prebuilt app, or builds locally for a source install;
 - installs into `~/Library/Application Support/RonaldinhoPet`;
 - merges its hooks without replacing existing hooks;
 - installs the native Codex pet under `~/.codex/pets/ronaldinho-gaucho`;
@@ -58,9 +68,8 @@ that work completed. Old terminal/unknown records are eligible for cleanup after
 
 ## Uninstall
 
-```sh
-./uninstall.sh
-```
+Double-click **Uninstall Ronaldinho Pet** in the downloaded release, or run
+`./uninstall.sh` from a source checkout.
 
 Owned hooks are removed exactly; unrelated settings remain. The app, state, and
 native Codex pet are moved to Trash so removal is recoverable.
@@ -76,8 +85,8 @@ installs twice, uninstalls, and checks that unknown hooks and settings survive.
 
 ## Current limitations
 
-- Source installation requires Xcode Command Line Tools. A true one-click release
-  requires a universal, signed, notarized build.
+- Release builds are universal and do not require Xcode. A warning-free first
+  launch still requires a Developer ID signature and Apple notarization.
 - Clicking Ronaldinho focuses the exact originating application. In the expanded
   match center, each host row is independently clickable. Exact terminal tabs are
   not exposed by host hooks, so focus stops at the application.
