@@ -9,6 +9,7 @@ CLAUDE_SETTINGS="${HOME}/.claude/settings.json"
 CLAUDE_COMMAND="${HOME}/.claude/commands/pet.md"
 CODEX_HOOKS="${HOME}/.codex/hooks.json"
 CODEX_PET="${HOME}/.codex/pets/ronaldinho-gaucho"
+CODEX_SKILL="${CODEX_HOME:-${HOME}/.codex}/skills/ronaldinho-pet"
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/ronaldinho-pet-install.XXXXXX")"
 COMMITTED=false
 
@@ -42,6 +43,12 @@ rollback() {
       ditto "$STAGE/previous-codex-pet" "$CODEX_PET"
     elif [ -e "$CODEX_PET" ]; then
       rm -rf "$CODEX_PET"
+    fi
+    if [ -e "$STAGE/previous-codex-skill" ]; then
+      rm -rf "$CODEX_SKILL"
+      ditto "$STAGE/previous-codex-skill" "$CODEX_SKILL"
+    elif [ -e "$CODEX_SKILL" ]; then
+      rm -rf "$CODEX_SKILL"
     fi
   fi
   rm -rf "$STAGE"
@@ -79,6 +86,7 @@ if [ -e "$CLAUDE_SETTINGS" ]; then cp -p "$CLAUDE_SETTINGS" "$STAGE/settings.jso
 if [ -e "$CLAUDE_COMMAND" ]; then cp -p "$CLAUDE_COMMAND" "$STAGE/pet.md"; fi
 if [ -e "$CODEX_HOOKS" ]; then cp -p "$CODEX_HOOKS" "$STAGE/hooks.json"; fi
 if [ -e "$CODEX_PET" ]; then ditto "$CODEX_PET" "$STAGE/previous-codex-pet"; fi
+if [ -e "$CODEX_SKILL" ]; then ditto "$CODEX_SKILL" "$STAGE/previous-codex-skill"; fi
 
 pkill -f "$TARGET_APP/Contents/MacOS/RonaldinhoPet" 2>/dev/null || true
 mkdir -p "$TARGET_ROOT"
@@ -90,6 +98,9 @@ chmod +x "$TARGET_ROOT/show-pet.sh"
 "$STAGE/configure-hooks" "$TARGET_ROOT" codex install
 mkdir -p "$CODEX_PET"
 cp "$ROOT/codex-pet/pet.json" "$ROOT/RonaldinhoPet/spritesheet.webp" "$CODEX_PET/"
+mkdir -p "${CODEX_SKILL:h}"
+rm -rf "$CODEX_SKILL"
+ditto "$ROOT/codex-skill/ronaldinho-pet" "$CODEX_SKILL"
 
 test -x "$TARGET_APP/Contents/MacOS/RonaldinhoPet"
 test -x "$TARGET_APP/Contents/Resources/RonaldinhoPetState"
@@ -98,6 +109,7 @@ if [ "${RONALDINHO_SKIP_LAUNCH:-false}" != true ]; then
   open -a "$TARGET_APP" || echo "Installed, but macOS did not launch the pet. Open $TARGET_APP manually." >&2
 fi
 
-echo "Ronaldinho Pet installed. In Codex CLI, run /hooks and trust the RonaldinhoPetState commands."
-echo "Then restart Claude and Codex so they reload the trusted hooks."
+echo "Ronaldinho Pet installed. If Codex asks, trust only the RonaldinhoPetState hook commands."
+echo "Then restart Claude and Codex so they reload the hooks."
 echo "In Codex App, open Settings → Pets → Refresh to select the native pet."
+echo "Run \$ronaldinho-pet in Codex App or CLI to show the floating companion."

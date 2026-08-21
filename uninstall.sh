@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 TARGET_ROOT="${HOME}/Library/Application Support/RonaldinhoPet"
+CODEX_SKILL="${CODEX_HOME:-${HOME}/.codex}/skills/ronaldinho-pet"
 CONFIGURATOR="$(mktemp "${TMPDIR:-/tmp}/ronaldinho-configure.XXXXXX")"
 trap 'rm -f "$CONFIGURATOR"' EXIT
 
@@ -22,5 +23,9 @@ fi
 if [ -d "${HOME}/.codex/pets/ronaldinho-gaucho" ]; then
   mkdir -p "${HOME}/.Trash"
   mv "${HOME}/.codex/pets/ronaldinho-gaucho" "${HOME}/.Trash/ronaldinho-gaucho-$(date +%Y%m%d-%H%M%S)"
+fi
+if [ -d "$CODEX_SKILL" ] && diff -qr "$ROOT/codex-skill/ronaldinho-pet" "$CODEX_SKILL" >/dev/null; then
+  mkdir -p "${HOME}/.Trash"
+  mv "$CODEX_SKILL" "${HOME}/.Trash/ronaldinho-pet-skill-$(date +%Y%m%d-%H%M%S)"
 fi
 echo "Ronaldinho Pet uninstalled. Restart Claude Code/Desktop to reload hooks."

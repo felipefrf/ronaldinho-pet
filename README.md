@@ -18,8 +18,8 @@ cd ronaldinho-pet
 ./install.sh
 ```
 
-In Codex CLI, run `/hooks`, review the commands ending in
-`RonaldinhoPetState ingest codex`, and trust them. Then restart Claude and Codex.
+If Codex prompts about hooks, review and trust only the commands ending in
+`RonaldinhoPetState ingest codex`. Then restart Claude and Codex.
 In Codex App, open **Settings → Pets → Refresh** to select the native pet.
 
 There are two intentional surfaces using the same sprite asset:
@@ -38,10 +38,12 @@ The installer:
 - installs into `~/Library/Application Support/RonaldinhoPet`;
 - merges its hooks without replacing existing hooks;
 - installs the native Codex pet under `~/.codex/pets/ronaldinho-gaucho`;
+- installs the `$ronaldinho-pet` skill for Codex App and CLI;
 - creates timestamped configuration backups only when content changes;
 - can be run repeatedly without duplicating entries.
 
-Run `/pet` in Claude Code to show the companion again.
+Run `/pet` in Claude Code or `$ronaldinho-pet` in Codex App/CLI to show the
+floating companion again. Codex reserves `/pet` for its native in-app pet.
 
 ## Concurrent sessions
 
@@ -75,7 +77,9 @@ installs twice, uninstalls, and checks that unknown hooks and settings survive.
 
 - Source installation requires Xcode Command Line Tools. A true one-click release
   requires a universal, signed, notarized build.
-- Clicking focuses the originating application, not necessarily its exact tab.
+- Clicking Ronaldinho focuses the exact originating application. In the expanded
+  match center, each host row is independently clickable. Exact terminal tabs are
+  not exposed by host hooks, so focus stops at the application.
 - Do not publish the bundled sprite asset until its redistribution rights and
   license have been confirmed.
 

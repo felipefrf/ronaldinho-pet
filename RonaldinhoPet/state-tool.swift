@@ -10,7 +10,7 @@ private func string(_ object: [String: Any], _ key: String) -> String? {
     return value
 }
 
-private func applicationBundleID(environment: [String: String]) -> String {
+private func applicationBundleID(source: String, environment: [String: String]) -> String {
     switch environment["TERM_PROGRAM"] ?? "" {
     case "Apple_Terminal": return "com.apple.Terminal"
     case "iTerm.app", "iTerm2": return "com.googlecode.iterm2"
@@ -20,7 +20,9 @@ private func applicationBundleID(environment: [String: String]) -> String {
     case "WezTerm": return "com.github.wez.wezterm"
     case "cmux", "CMux", "cmux.app": return "com.cmuxterm.app"
     case "vscode", "Code": return "com.microsoft.VSCode"
-    default: return environment["RONALDINHO_SOURCE_BUNDLE_ID"] ?? "com.anthropic.claude-code"
+    default:
+        return environment["RONALDINHO_SOURCE_BUNDLE_ID"]
+            ?? (source == "codex" ? "com.openai.codex" : "com.anthropic.claude-code")
     }
 }
 
@@ -88,7 +90,7 @@ private func ingest(source: String) {
                 schemaVersion: PetStore.schemaVersion, source: source, sessionID: sessionID,
                 turn: turn, revision: (previous?.revision ?? 0) + 1,
                 eventID: eventID, event: event, state: state, message: message,
-                applicationBundleID: applicationBundleID(environment: ProcessInfo.processInfo.environment),
+                applicationBundleID: applicationBundleID(source: source, environment: ProcessInfo.processInfo.environment),
                 unread: ["completed", "failed"].contains(state), receivedAt: now, lastActivityAt: now
             )
             if let previous, previous.eventID == snapshot.eventID, previous.state == snapshot.state { return }

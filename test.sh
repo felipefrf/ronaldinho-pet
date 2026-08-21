@@ -35,6 +35,7 @@ printf '%s\n' '{"session_id":"fixture-session","hook_event_name":"PostToolUse"}'
 printf '%s\n' '{"session_id":"fixture-session","hook_event_name":"UserPromptSubmit"}' | "$HELPER" ingest codex
 test "$(find "$RONALDINHO_PET_ROOT/sessions" -type f -name '*.json' | wc -l | tr -d ' ')" = 3
 "$HELPER" inspect codex fixture-session | grep -q 'Codex is thinking'
+"$HELPER" inspect codex fixture-session | grep -q '"applicationBundleID":"com.openai.codex"'
 
 # Concurrent updates remain valid JSON under the per-session lock.
 printf '%s\n' '{"session_id":"concurrent","hook_event_name":"UserPromptSubmit"}' | "$HELPER" ingest claude
@@ -76,6 +77,8 @@ mkdir -p "$PUBLIC_HOME/.claude" "$PUBLIC_HOME/.codex"
 printf '%s\n' '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"keep-claude"}]}]}}' > "$PUBLIC_HOME/.claude/settings.json"
 printf '%s\n' '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"keep-codex"}]}]}}' > "$PUBLIC_HOME/.codex/hooks.json"
 HOME="$PUBLIC_HOME" RONALDINHO_CONFIG_HOME="$PUBLIC_HOME" RONALDINHO_SKIP_LAUNCH=true zsh "$ROOT/install.sh" >/dev/null
+test -f "$PUBLIC_HOME/.codex/skills/ronaldinho-pet/SKILL.md"
+grep -q 'name: ronaldinho-pet' "$PUBLIC_HOME/.codex/skills/ronaldinho-pet/SKILL.md"
 PUBLIC_HASH="$(shasum -a 256 "$PUBLIC_HOME/.claude/settings.json" "$PUBLIC_HOME/.codex/hooks.json")"
 BACKUP_COUNT="$(find "$PUBLIC_HOME" -name '*.ronaldinho-backup-*' | wc -l | tr -d ' ')"
 HOME="$PUBLIC_HOME" RONALDINHO_CONFIG_HOME="$PUBLIC_HOME" RONALDINHO_SKIP_LAUNCH=true zsh "$ROOT/install.sh" >/dev/null
@@ -88,6 +91,7 @@ if rg -q RonaldinhoPetState "$PUBLIC_HOME/.claude/settings.json" "$PUBLIC_HOME/.
   echo "Uninstall left owned hooks behind." >&2
   exit 1
 fi
+test ! -e "$PUBLIC_HOME/.codex/skills/ronaldinho-pet"
 
 if rg -n '/Users/felipefrf|development/personal' "$ROOT" \
   -g '!EXECUTION_PLAN.md' -g '!test.sh' -g '!*.webp' -g '!.git/**'; then

@@ -25,7 +25,6 @@ private final class PetView: NSView {
     private var isHovering = false
     private var interactionState: String?
     private var statusMessage: String?
-    private var terminalBundleID: String?
     private var displayedSnapshot: PetSnapshot?
     private var recentSnapshots: [PetSnapshot] = []
     private var statusExpanded = false
@@ -33,7 +32,7 @@ private final class PetView: NSView {
     private var trackingArea: NSTrackingArea?
     private var animationTimer: Timer?
     private var stateTimer: Timer?
-    private let activateClaudeSession: (String?) -> Bool
+    private let activateSession: (String) -> Bool
     private let showCompanion: () -> Void
     private let setStatusPanelExpanded: (Bool) -> Void
     private let acknowledgeStatus: (PetSnapshot) -> Void
@@ -44,14 +43,14 @@ private final class PetView: NSView {
         frame: NSRect,
         spriteSheetURL: URL?,
         stateRootURL: URL,
-        activateClaudeSession: @escaping (String?) -> Bool,
+        activateSession: @escaping (String) -> Bool,
         showCompanion: @escaping () -> Void,
         setStatusPanelExpanded: @escaping (Bool) -> Void,
         acknowledgeStatus: @escaping (PetSnapshot) -> Void
     ) {
         self.stateRootURL = stateRootURL
         self.spriteSheet = spriteSheetURL.flatMap(NSImage.init(contentsOf:))
-        self.activateClaudeSession = activateClaudeSession
+        self.activateSession = activateSession
         self.showCompanion = showCompanion
         self.setStatusPanelExpanded = setStatusPanelExpanded
         self.acknowledgeStatus = acknowledgeStatus
@@ -87,7 +86,7 @@ private final class PetView: NSView {
     }
 
     private var statusAreaHeight: CGFloat {
-        statusExpanded ? 62 : 26
+        statusExpanded ? 76 : 26
     }
 
     private var petRect: NSRect {
@@ -97,14 +96,19 @@ private final class PetView: NSView {
     }
 
     private var statusControlRect: NSRect {
-        let height: CGFloat = statusExpanded ? 54 : 20
-        let width: CGFloat = statusExpanded ? min(bounds.width - 36, 204) : bounds.width - 16
+        let height: CGFloat = statusExpanded ? 68 : 20
+        let width: CGFloat = statusExpanded ? min(bounds.width - 24, 216) : bounds.width - 16
         return NSRect(
             x: (bounds.width - width) / 2,
             y: petRect.maxY + (statusAreaHeight - height) / 2,
             width: width,
             height: height
         )
+    }
+
+    private func hostRowRect(_ index: Int) -> NSRect {
+        let badge = statusControlRect
+        return NSRect(x: badge.minX + 7, y: badge.minY + 22 + CGFloat(index * 21), width: badge.width - 14, height: 19)
     }
 
     private func readState() {
@@ -139,33 +143,37 @@ private final class PetView: NSView {
 
         let message = "Claude: \(hostStatus("claude", compact: true)) · Codex: \(hostStatus("codex", compact: true))"
         let unread = decoded.unread && !terminalIsFrontmost
-        if message != statusMessage || decoded.applicationBundleID != terminalBundleID || unread != statusUnread {
+        if message != statusMessage || unread != statusUnread {
             statusMessage = message
-            terminalBundleID = decoded.applicationBundleID
             statusUnread = unread
             needsDisplay = true
         }
     }
 
+    private func snapshotPriority(_ snapshot: PetSnapshot) -> Int {
+        let unread = snapshot.unread && !PetStore.isAcknowledged(snapshot, root: stateRootURL)
+        switch snapshot.state {
+        case "waiting": return 7
+        case "failed": return unread ? 6 : 2
+        case "completed": return unread ? 5 : 1
+        case "running": return 4
+        case "stale": return 3
+        default: return 0
+        }
+    }
+
+    private func selectedSnapshot(for source: String) -> PetSnapshot? {
+        let snapshots = recentSnapshots.filter { $0.source == source }
+        return snapshots.max {
+            let left = snapshotPriority($0)
+            let right = snapshotPriority($1)
+            return left == right ? $0.receivedAt < $1.receivedAt : left < right
+        }
+    }
+
     private func hostStatus(_ source: String, compact: Bool) -> String {
         let snapshots = recentSnapshots.filter { $0.source == source }
-        guard !snapshots.isEmpty else { return compact ? "—" : "no signal" }
-        func priority(_ snapshot: PetSnapshot) -> Int {
-            let unread = snapshot.unread && !PetStore.isAcknowledged(snapshot, root: stateRootURL)
-            switch snapshot.state {
-            case "waiting": return 7
-            case "failed": return unread ? 6 : 2
-            case "completed": return unread ? 5 : 1
-            case "running": return 4
-            case "stale": return 3
-            default: return 0
-            }
-        }
-        let selected = snapshots.max {
-            let left = priority($0)
-            let right = priority($1)
-            return left == right ? $0.receivedAt < $1.receivedAt : left < right
-        }!
+        guard let selected = selectedSnapshot(for: source) else { return compact ? "—" : "no signal" }
         let acknowledged = PetStore.isAcknowledged(selected, root: stateRootURL)
         let count = snapshots.filter { $0.state == selected.state }.count
         let label: String
@@ -207,10 +215,21 @@ private final class PetView: NSView {
         needsDisplay = true
     }
 
+    private func activate(_ snapshot: PetSnapshot) {
+        if snapshot.unread && !PetStore.isAcknowledged(snapshot, root: stateRootURL) {
+            acknowledgeStatus(snapshot)
+        }
+        guard activateSession(snapshot.applicationBundleID) else {
+            statusMessage = "\(snapshot.source == "codex" ? "Codex" : "Claude") is no longer open"
+            needsDisplay = true
+            return
+        }
+    }
+
     private func defaultStatusMessage() -> String {
         switch state {
         case "running":
-            return "Claude is working…"
+            return "Work in progress…"
         case "waiting":
             return "Input needed — click to return"
         case "review":
@@ -238,11 +257,26 @@ private final class PetView: NSView {
         }
     }
 
+    private func statusTint(for snapshot: PetSnapshot?) -> NSColor {
+        guard let snapshot else { return .systemGray }
+        switch snapshot.state {
+        case "running": return NSColor(calibratedRed: 0.18, green: 0.82, blue: 0.42, alpha: 1)
+        case "waiting": return .systemOrange
+        case "failed": return .systemRed
+        case "completed": return NSColor(calibratedRed: 0.98, green: 0.83, blue: 0.08, alpha: 1)
+        default: return .systemGray
+        }
+    }
+
     private func drawStatusBadge() {
         let badgeRect = statusControlRect
+        if statusExpanded {
+            drawScoreboard(in: badgeRect)
+            return
+        }
+
         let badgePath = NSBezierPath(roundedRect: badgeRect, xRadius: badgeRect.height / 2, yRadius: badgeRect.height / 2)
         let tint = statusTint()
-
         NSColor.white.withAlphaComponent(0.74).setFill()
         badgePath.fill()
         tint.withAlphaComponent(0.20).setFill()
@@ -251,16 +285,13 @@ private final class PetView: NSView {
         badgePath.lineWidth = 1
         badgePath.stroke()
 
-        let headerY = statusExpanded ? badgeRect.minY + 7 : badgeRect.midY - 3.5
+        let headerY = badgeRect.midY - 3.5
         let dotRect = NSRect(x: badgeRect.minX + 10, y: headerY, width: 7, height: 7)
         tint.setFill()
         NSBezierPath(ovalIn: dotRect).fill()
 
         let message: String
-        if statusExpanded {
-            let active = recentSnapshots.filter { ["running", "waiting"].contains($0.state) }.count
-            message = active == 0 ? "All seen" : "\(active) active"
-        } else if let statusMessage, !statusMessage.isEmpty {
+        if let statusMessage, !statusMessage.isEmpty {
             message = statusMessage
         } else {
             message = defaultStatusMessage()
@@ -274,20 +305,67 @@ private final class PetView: NSView {
             .paragraphStyle: paragraphStyle,
         ]
         message.draw(in: NSRect(x: dotRect.maxX + 6, y: headerY - 3, width: badgeRect.maxX - dotRect.maxX - 16, height: 14), withAttributes: attributes)
+    }
 
-        if statusExpanded {
-            for (index, source) in ["claude", "codex"].enumerated() {
-                let name = source == "codex" ? "Codex" : "Claude"
-                let row = "\(name)  ·  \(hostStatus(source, compact: false))"
-                let rowAttributes: [NSAttributedString.Key: Any] = [
-                    .foregroundColor: NSColor.black.withAlphaComponent(0.72),
-                    .font: NSFont.systemFont(ofSize: 10, weight: .medium),
+    private func drawScoreboard(in rect: NSRect) {
+        let board = NSBezierPath(roundedRect: rect, xRadius: 12, yRadius: 12)
+        NSColor(calibratedRed: 0.035, green: 0.10, blue: 0.065, alpha: 0.96).setFill()
+        board.fill()
+        NSColor(calibratedRed: 0.98, green: 0.83, blue: 0.08, alpha: 0.82).setStroke()
+        board.lineWidth = 1
+        board.stroke()
+
+        let active = recentSnapshots.filter { ["running", "waiting"].contains($0.state) }.count
+        let headerStyle = NSMutableParagraphStyle()
+        headerStyle.alignment = .left
+        "MATCH CENTER".draw(
+            in: NSRect(x: rect.minX + 11, y: rect.minY + 6, width: 110, height: 12),
+            withAttributes: [
+                .foregroundColor: NSColor(calibratedRed: 0.98, green: 0.83, blue: 0.08, alpha: 1),
+                .font: NSFont.monospacedSystemFont(ofSize: 8.5, weight: .bold),
+                .paragraphStyle: headerStyle,
+            ]
+        )
+        let countStyle = NSMutableParagraphStyle()
+        countStyle.alignment = .right
+        (active == 0 ? "ALL SEEN" : "\(active) LIVE").draw(
+            in: NSRect(x: rect.maxX - 76, y: rect.minY + 6, width: 65, height: 12),
+            withAttributes: [
+                .foregroundColor: NSColor.white.withAlphaComponent(0.72),
+                .font: NSFont.monospacedSystemFont(ofSize: 8, weight: .medium),
+                .paragraphStyle: countStyle,
+            ]
+        )
+
+        for (index, source) in ["claude", "codex"].enumerated() {
+            let snapshot = selectedSnapshot(for: source)
+            let rowRect = hostRowRect(index)
+            NSColor.white.withAlphaComponent(index == 0 ? 0.055 : 0.035).setFill()
+            NSBezierPath(roundedRect: rowRect, xRadius: 5, yRadius: 5).fill()
+
+            let dot = NSRect(x: rowRect.minX + 8, y: rowRect.midY - 3, width: 6, height: 6)
+            statusTint(for: snapshot).setFill()
+            NSBezierPath(ovalIn: dot).fill()
+
+            let name = source == "codex" ? "CODEX" : "CLAUDE"
+            name.draw(
+                in: NSRect(x: dot.maxX + 7, y: rowRect.minY + 3, width: 66, height: 14),
+                withAttributes: [
+                    .foregroundColor: NSColor.white.withAlphaComponent(0.94),
+                    .font: NSFont.systemFont(ofSize: 10, weight: .semibold),
                 ]
-                row.draw(
-                    in: NSRect(x: badgeRect.minX + 14, y: badgeRect.minY + 24 + CGFloat(index * 15), width: badgeRect.width - 28, height: 14),
-                    withAttributes: rowAttributes
-                )
-            }
+            )
+            let statusStyle = NSMutableParagraphStyle()
+            statusStyle.alignment = .right
+            statusStyle.lineBreakMode = .byTruncatingTail
+            hostStatus(source, compact: false).uppercased().draw(
+                in: NSRect(x: rowRect.midX - 1, y: rowRect.minY + 3, width: rowRect.width / 2 - 8, height: 14),
+                withAttributes: [
+                    .foregroundColor: NSColor.white.withAlphaComponent(0.70),
+                    .font: NSFont.monospacedSystemFont(ofSize: 8.5, weight: .medium),
+                    .paragraphStyle: statusStyle,
+                ]
+            )
         }
     }
 
@@ -326,6 +404,12 @@ private final class PetView: NSView {
     override func mouseDown(with event: NSEvent) {
         let viewLocation = convert(event.locationInWindow, from: nil)
         if statusControlRect.contains(viewLocation) {
+            if statusExpanded {
+                for (index, source) in ["claude", "codex"].enumerated() where hostRowRect(index).contains(viewLocation) {
+                    if let snapshot = selectedSnapshot(for: source) { activate(snapshot) }
+                    return
+                }
+            }
             acknowledgeUnreadStatus()
             setStatusExpanded(!statusExpanded)
             return
@@ -359,11 +443,7 @@ private final class PetView: NSView {
         setInteractionState(isHovering ? "jumping" : nil)
 
         if !didDrag {
-            acknowledgeUnreadStatus()
-            if !activateClaudeSession(terminalBundleID) {
-                statusMessage = "Open a Claude terminal to return"
-                needsDisplay = true
-            }
+            if let displayedSnapshot { activate(displayedSnapshot) }
         }
     }
 
@@ -445,8 +525,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             frame: NSRect(origin: .zero, size: rect.size),
             spriteSheetURL: spriteSheetURL,
             stateRootURL: companionDirectory,
-            activateClaudeSession: { [weak self] bundleID in
-                self?.activateClaudeTerminal(bundleID: bundleID) ?? false
+            activateSession: { [weak self] bundleID in
+                self?.activateSession(bundleID: bundleID) ?? false
             },
             showCompanion: { [weak self] in
                 self?.showCompanion()
@@ -462,25 +542,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.panel = panel
     }
 
-    private func activateClaudeTerminal(bundleID: String?) -> Bool {
-        let fallbacks = [
-            "com.apple.Terminal",
-            "com.googlecode.iterm2",
-            "dev.warp.Warp-Stable",
-            "com.mitchellh.ghostty",
-            "net.kovidgoyal.kitty",
-            "com.github.wez.wezterm",
-            "com.cmuxterm.app",
-            "com.microsoft.VSCode",
-        ]
-        let candidates = [bundleID].compactMap { $0 } + fallbacks
-        let runningApplications = NSWorkspace.shared.runningApplications
-        for candidate in candidates {
-            if let application = runningApplications.first(where: { $0.bundleIdentifier == candidate && !$0.isTerminated }) {
-                return application.activate(options: [])
-            }
-        }
-        return false
+    private func activateSession(bundleID: String) -> Bool {
+        guard let application = NSWorkspace.shared.runningApplications.first(where: {
+            $0.bundleIdentifier == bundleID && !$0.isTerminated
+        }) else { return false }
+        return application.activate(options: [])
     }
 
     private func showCompanion() {
@@ -524,7 +590,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func panelSize(statusExpanded: Bool) -> NSSize {
-        NSSize(width: 240, height: 260 * petScale + (statusExpanded ? 62 : 26))
+        NSSize(width: 240, height: 260 * petScale + (statusExpanded ? 76 : 26))
     }
 
     private func initialFrame(on preferredScreen: NSScreen? = nil, statusExpanded: Bool = false) -> NSRect {
