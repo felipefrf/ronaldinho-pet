@@ -10,7 +10,7 @@ private func string(_ object: [String: Any], _ key: String) -> String? {
     return value
 }
 
-private func applicationBundleID(source: String, environment: [String: String]) -> String {
+private func applicationBundleID(host: PetHost, environment: [String: String]) -> String {
     switch environment["TERM_PROGRAM"] ?? "" {
     case "Apple_Terminal": return "com.apple.Terminal"
     case "iTerm.app", "iTerm2": return "com.googlecode.iterm2"
@@ -22,7 +22,7 @@ private func applicationBundleID(source: String, environment: [String: String]) 
     case "vscode", "Code": return "com.microsoft.VSCode"
     default:
         return environment["RONALDINHO_SOURCE_BUNDLE_ID"]
-            ?? (source == "codex" ? "com.openai.codex" : "com.anthropic.claude-code")
+            ?? host.defaultBundleID
     }
 }
 
@@ -41,37 +41,8 @@ private func withLock<T>(at lockURL: URL, body: () throws -> T) throws -> T {
     throw NSError(domain: "RonaldinhoPet", code: 1, userInfo: [NSLocalizedDescriptionKey: "Timed out waiting for session lock"])
 }
 
-private func stateAndMessage(source: String, event: String, input: [String: Any], previous: PetSnapshot?) -> (String, String)? {
-    let name = source == "codex" ? "Codex" : "Claude"
-    switch event {
-    case "SessionStart": return ("idle", "\(name) is ready")
-    case "UserPromptSubmit": return ("running", "\(name) is thinking…")
-    case "PreToolUse", "PostToolUse", "PostToolUseFailure", "PostToolBatch":
-        if let previous, ["completed", "failed", "ended"].contains(previous.state) { return nil }
-        return ("running", "\(name) is working…")
-    case "PermissionRequest":
-        if source == "codex" {
-            if let previous, ["completed", "failed", "ended"].contains(previous.state) { return nil }
-            return ("running", "Codex is checking permission…")
-        }
-        return ("waiting", "Claude needs your input")
-    case "Elicitation": return ("waiting", "\(name) needs your input")
-    case "Notification":
-        let type = string(input, "notification_type") ?? ""
-        guard ["permission_prompt", "idle_prompt", "agent_needs_input"].contains(type) else { return nil }
-        return ("waiting", "\(name) needs your input")
-    case "Stop":
-        if let tasks = input["background_tasks"] as? [Any], !tasks.isEmpty {
-            return ("running", "\(name) is waiting for agents…")
-        }
-        return ("completed", "\(name) finished")
-    case "StopFailure": return ("failed", "\(name) stopped with an error")
-    case "SessionEnd": return ("ended", "\(name) session ended")
-    default: return nil
-    }
-}
-
 private func ingest(source: String) {
+    guard let adapter = PetHosts.adapter(id: source) else { fail("Unknown host: \(source)") }
     let data = FileHandle.standardInput.readDataToEndOfFile()
     guard let input = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
           let sessionID = string(input, "session_id"),
@@ -86,7 +57,8 @@ private func ingest(source: String) {
     do {
         try withLock(at: lock) {
             let previous = PetStore.readSnapshot(at: url)
-            guard let (state, message) = stateAndMessage(source: source, event: event, input: input, previous: previous) else { return }
+            guard let transition = adapter.transition(event: event, input: input, previous: previous) else { return }
+            let state = transition.state
             let now = Int64(Date().timeIntervalSince1970 * 1_000)
             let turn = event == "UserPromptSubmit" ? (previous?.turn ?? 0) + 1 : (previous?.turn ?? 0)
             let eventID = ["completed", "failed"].contains(state)
@@ -95,9 +67,10 @@ private func ingest(source: String) {
             let snapshot = PetSnapshot(
                 schemaVersion: PetStore.schemaVersion, source: source, sessionID: sessionID,
                 turn: turn, revision: (previous?.revision ?? 0) + 1,
-                eventID: eventID, event: event, state: state, message: message,
-                applicationBundleID: applicationBundleID(source: source, environment: ProcessInfo.processInfo.environment),
-                unread: ["completed", "failed"].contains(state), receivedAt: now, lastActivityAt: now
+                eventID: eventID, event: event, state: state, message: transition.message,
+                applicationBundleID: applicationBundleID(host: adapter.host, environment: ProcessInfo.processInfo.environment),
+                unread: ["completed", "failed"].contains(state), receivedAt: now, lastActivityAt: now,
+                activeSubagentIDs: transition.activeSubagentIDs
             )
             if let previous, previous.eventID == snapshot.eventID, previous.state == snapshot.state { return }
             try PetStore.write(snapshot, to: url)

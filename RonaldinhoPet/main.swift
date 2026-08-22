@@ -88,7 +88,7 @@ private final class PetView: NSView {
     }
 
     private var statusAreaHeight: CGFloat {
-        statusExpanded ? 76 : 26
+        statusExpanded ? PetHosts.expandedStatusHeight : 26
     }
 
     private var petRect: NSRect {
@@ -98,7 +98,7 @@ private final class PetView: NSView {
     }
 
     private var statusControlRect: NSRect {
-        let height: CGFloat = statusExpanded ? 68 : 20
+        let height: CGFloat = statusExpanded ? PetHosts.expandedStatusHeight - 8 : 20
         let width: CGFloat = statusExpanded ? min(bounds.width - 24, 216) : bounds.width - 16
         return NSRect(
             x: (bounds.width - width) / 2,
@@ -143,7 +143,9 @@ private final class PetView: NSView {
             needsDisplay = true
         }
 
-        let message = "Claude: \(hostStatus("claude", compact: true)) · Codex: \(hostStatus("codex", compact: true))"
+        let message = PetHosts.all
+            .map { "\($0.name): \(hostStatus($0.id, compact: true))" }
+            .joined(separator: " · ")
         let unread = decoded.unread && !terminalIsFrontmost
         if message != statusMessage || unread != statusUnread {
             statusMessage = message
@@ -222,7 +224,7 @@ private final class PetView: NSView {
             acknowledgeStatus(snapshot)
         }
         guard activateSession(snapshot.applicationBundleID) else {
-            statusMessage = "\(snapshot.source == "codex" ? "Codex" : "Claude") is no longer open"
+            statusMessage = "\(PetHosts.host(id: snapshot.source)?.name ?? snapshot.source.capitalized) is no longer open"
             needsDisplay = true
             return
         }
@@ -337,8 +339,8 @@ private final class PetView: NSView {
             ]
         )
 
-        for (index, source) in ["claude", "codex"].enumerated() {
-            let snapshot = selectedSnapshot(for: source)
+        for (index, host) in PetHosts.all.enumerated() {
+            let snapshot = selectedSnapshot(for: host.id)
             let rowRect = hostRowRect(index)
             NSColor.white.withAlphaComponent(index == 0 ? 0.055 : 0.035).setFill()
             NSBezierPath(roundedRect: rowRect, xRadius: 5, yRadius: 5).fill()
@@ -347,8 +349,7 @@ private final class PetView: NSView {
             statusTint(for: snapshot).setFill()
             NSBezierPath(ovalIn: dot).fill()
 
-            let name = source == "codex" ? "CODEX" : "CLAUDE"
-            name.draw(
+            host.name.uppercased().draw(
                 in: NSRect(x: dot.maxX + 7, y: rowRect.minY + 3, width: 66, height: 14),
                 withAttributes: [
                     .foregroundColor: NSColor.white.withAlphaComponent(0.94),
@@ -358,7 +359,7 @@ private final class PetView: NSView {
             let statusStyle = NSMutableParagraphStyle()
             statusStyle.alignment = .right
             statusStyle.lineBreakMode = .byTruncatingTail
-            hostStatus(source, compact: false).uppercased().draw(
+            hostStatus(host.id, compact: false).uppercased().draw(
                 in: NSRect(x: rowRect.midX - 1, y: rowRect.minY + 3, width: rowRect.width / 2 - 8, height: 14),
                 withAttributes: [
                     .foregroundColor: NSColor.white.withAlphaComponent(0.70),
@@ -405,8 +406,8 @@ private final class PetView: NSView {
         let viewLocation = convert(event.locationInWindow, from: nil)
         if statusControlRect.contains(viewLocation) {
             if statusExpanded {
-                for (index, source) in ["claude", "codex"].enumerated() where hostRowRect(index).contains(viewLocation) {
-                    if let snapshot = selectedSnapshot(for: source) { activate(snapshot) }
+                for (index, host) in PetHosts.all.enumerated() where hostRowRect(index).contains(viewLocation) {
+                    if let snapshot = selectedSnapshot(for: host.id) { activate(snapshot) }
                     return
                 }
             }
@@ -488,6 +489,8 @@ private final class PetView: NSView {
         let menu = NSMenu()
         let resetItem = menu.addItem(withTitle: "Reset position", action: #selector(AppDelegate.resetPosition), keyEquivalent: "")
         resetItem.target = NSApp.delegate as? AppDelegate
+        let connectionsItem = menu.addItem(withTitle: "Connections…", action: #selector(AppDelegate.showConnections), keyEquivalent: "")
+        connectionsItem.target = NSApp.delegate as? AppDelegate
 
         let sizeControl = NSView(frame: NSRect(x: 0, y: 0, width: 240, height: 48))
         let label = NSTextField(labelWithString: "Pet size")
@@ -523,6 +526,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let companionDirectory = PetStore.rootURL()
     private var panel: NSPanel?
     private var globalScrollMonitor: Any?
+    private lazy var connectionsWindow = ConnectionsWindowController()
     private var petScale: CGFloat {
         let stored = UserDefaults.standard.double(forKey: "petScale")
         return stored == 0 ? 0.60 : CGFloat(stored)
@@ -566,6 +570,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self, let panel, panel.frame.contains(NSEvent.mouseLocation), event.scrollingDeltaY != 0 else { return }
             self.setPetScale(self.petScale + max(-0.10, min(0.10, event.scrollingDeltaY * 0.01)))
         }
+        if !connectionsWindow.hasConnectedHost {
+            DispatchQueue.main.async { [weak self] in self?.showConnections() }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -608,7 +615,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func panelSize(statusExpanded: Bool) -> NSSize {
-        NSSize(width: 240, height: 260 * petScale + (statusExpanded ? 76 : 26))
+        NSSize(width: 240, height: 260 * petScale + (statusExpanded ? PetHosts.expandedStatusHeight : 26))
     }
 
     private func initialFrame(on preferredScreen: NSScreen? = nil, statusExpanded: Bool = false) -> NSRect {
@@ -639,6 +646,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func changePetSize(_ sender: NSSlider) {
         setPetScale(CGFloat(sender.doubleValue))
+    }
+
+    @objc func showConnections() {
+        connectionsWindow.showWindow(nil)
     }
 
     @objc func quit() {

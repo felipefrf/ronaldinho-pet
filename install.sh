@@ -72,9 +72,9 @@ if [ "${RONALDINHO_SKIP_HOST_CHECK:-false}" != true ] \
   exit 1
 fi
 
-if [ -x "$PREBUILT_ROOT/RonaldinhoPet.app/Contents/MacOS/RonaldinhoPet" ] && [ -x "$PREBUILT_ROOT/configure-hooks" ]; then
+if [ -x "$PREBUILT_ROOT/RonaldinhoPet.app/Contents/MacOS/RonaldinhoPet" ] \
+  && [ -x "$PREBUILT_ROOT/RonaldinhoPet.app/Contents/Resources/RonaldinhoConfigureHooks" ]; then
   BUILD_APP="$PREBUILT_ROOT/RonaldinhoPet.app"
-  CONFIGURATOR="$PREBUILT_ROOT/configure-hooks"
 else
   if ! command -v swiftc >/dev/null 2>&1 || ! command -v xcrun >/dev/null 2>&1; then
     echo "Xcode Command Line Tools are required for a source install. Use the prebuilt release instead." >&2
@@ -83,11 +83,7 @@ else
   export RONALDINHO_BUILD_ROOT="$STAGE/build"
   export CLANG_MODULE_CACHE_PATH="$STAGE/module-cache"
   zsh "$SOURCE/build-app.sh" "$SOURCE/spritesheet.webp" >/dev/null
-  SDK_PATH="$(xcrun --show-sdk-path)"
-  swiftc -sdk "$SDK_PATH" -target "$(uname -m)-apple-macosx${RONALDINHO_DEPLOYMENT_TARGET:-$(xcrun --show-sdk-version)}" -module-cache-path "$CLANG_MODULE_CACHE_PATH" \
-    "$SOURCE/configure-hooks.swift" -o "$STAGE/configure-hooks"
   BUILD_APP="$STAGE/build/RonaldinhoPet.app"
-  CONFIGURATOR="$STAGE/configure-hooks"
 fi
 
 if [ -e "$TARGET_ROOT" ]; then ditto "$TARGET_ROOT" "$STAGE/previous-install"; fi
@@ -104,16 +100,13 @@ ditto "$BUILD_APP" "$TARGET_APP"
 cp "$SOURCE/show-pet.sh" "$TARGET_ROOT/show-pet.sh"
 chmod +x "$TARGET_ROOT/show-pet.sh"
 /usr/bin/xattr -dr com.apple.quarantine "$TARGET_ROOT" 2>/dev/null || true
+CONFIGURATOR="$TARGET_APP/Contents/Resources/RonaldinhoConfigureHooks"
 "$CONFIGURATOR" "$TARGET_ROOT" claude install
 "$CONFIGURATOR" "$TARGET_ROOT" codex install
-mkdir -p "$CODEX_PET"
-cp "$ROOT/codex-pet/pet.json" "$ROOT/RonaldinhoPet/spritesheet.webp" "$CODEX_PET/"
-mkdir -p "${CODEX_SKILL:h}"
-rm -rf "$CODEX_SKILL"
-ditto "$ROOT/codex-skill/ronaldinho-pet" "$CODEX_SKILL"
 
 test -x "$TARGET_APP/Contents/MacOS/RonaldinhoPet"
 test -x "$TARGET_APP/Contents/Resources/RonaldinhoPetState"
+test -x "$TARGET_APP/Contents/Resources/RonaldinhoConfigureHooks"
 COMMITTED=true
 if [ "${RONALDINHO_SKIP_LAUNCH:-false}" != true ]; then
   open -a "$TARGET_APP" || echo "Installed, but macOS did not launch the pet. Open $TARGET_APP manually." >&2

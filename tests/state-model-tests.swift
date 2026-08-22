@@ -5,7 +5,7 @@ private func snapshot(source: String, session: String, state: String, unread: Bo
         schemaVersion: 1, source: source, sessionID: session, turn: 1, revision: 1,
         eventID: "\(source)-\(session)-\(state)", event: state, state: state,
         message: state, applicationBundleID: "test", unread: unread,
-        receivedAt: time, lastActivityAt: time
+        receivedAt: time, lastActivityAt: time, activeSubagentIDs: nil
     )
 }
 

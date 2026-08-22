@@ -19,6 +19,15 @@ private func command(of value: Any) -> String? {
     (value as? JSONDictionary)?["command"] as? String
 }
 
+private func contains(command expected: String, in hooks: JSONDictionary) -> Bool {
+    hooks.values.contains { value in
+        (value as? [Any] ?? []).contains { rawGroup in
+            let group = rawGroup as? JSONDictionary
+            return (group?["hooks"] as? [Any] ?? []).contains { command(of: $0) == expected }
+        }
+    }
+}
+
 private func groupsRemoving(commands: Set<String>, from value: Any?) -> [JSONDictionary] {
     guard let groups = value as? [Any] else { return [] }
     return groups.compactMap { raw in
@@ -41,23 +50,35 @@ private func add(_ event: String, matcher: String? = nil, command: String, hooks
     hooks[event] = groups
 }
 
+private func replaceDirectory(from source: URL, to target: URL) throws {
+    let manager = FileManager.default
+    guard manager.fileExists(atPath: source.path) else { return }
+    try manager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+    if manager.fileExists(atPath: target.path) { try manager.removeItem(at: target) }
+    try manager.copyItem(at: source, to: target)
+}
+
+@main
+private struct ConfigureHooks {
+static func main() {
 let arguments = CommandLine.arguments
-guard arguments.count == 4 else { fail("Usage: RonaldinhoConfigureHooks <installation-root> <claude|codex> <install|remove>") }
-let host = arguments[2]
+guard arguments.count == 4 else { fail("Usage: RonaldinhoConfigureHooks <installation-root> <host> <install|remove|status>") }
+let hostID = arguments[2]
 let mode = arguments[3]
-guard ["claude", "codex"].contains(host) else { fail("Host must be claude or codex") }
-guard ["install", "remove"].contains(mode) else { fail("Mode must be install or remove") }
+guard let host = PetHosts.host(id: hostID) else { fail("Unknown host: \(hostID)") }
+guard ["install", "remove", "status"].contains(mode) else { fail("Mode must be install, remove, or status") }
 
 let root = URL(fileURLWithPath: arguments[1], isDirectory: true).standardizedFileURL
 let helper = root.appendingPathComponent("RonaldinhoPet.app/Contents/Resources/RonaldinhoPetState").path
-let app = root.appendingPathComponent("RonaldinhoPet.app").path
-let ingest = "\(shellQuote(helper)) ingest \(host)"
+let appURL = root.appendingPathComponent("RonaldinhoPet.app", isDirectory: true)
+let app = appURL.path
+let ingest = "\(shellQuote(helper)) ingest \(host.id)"
 
 let environment = ProcessInfo.processInfo.environment
 let home = environment["RONALDINHO_CONFIG_HOME"].map { URL(fileURLWithPath: $0, isDirectory: true) }
     ?? FileManager.default.homeDirectoryForCurrentUser
-let configDirectory = home.appendingPathComponent(host == "claude" ? ".claude" : ".codex", isDirectory: true)
-let settingsURL = configDirectory.appendingPathComponent(host == "claude" ? "settings.json" : "hooks.json")
+let configDirectory = home.appendingPathComponent(host.configDirectory, isDirectory: true)
+let settingsURL = configDirectory.appendingPathComponent(host.settingsFilename)
 let commandURL = configDirectory.appendingPathComponent("commands/pet.md")
 
 var settings: JSONDictionary = [:]
@@ -66,11 +87,11 @@ if FileManager.default.fileExists(atPath: settingsURL.path) {
     do {
         let data = try Data(contentsOf: settingsURL)
         guard let decoded = try JSONSerialization.jsonObject(with: data) as? JSONDictionary else {
-            fail("Claude settings must contain a JSON object: \(settingsURL.path)")
+            fail("\(host.name) settings must contain a JSON object: \(settingsURL.path)")
         }
         originalData = data
         settings = decoded
-    } catch { fail("Unable to read Claude settings: \(error.localizedDescription)") }
+    } catch { fail("Unable to read \(host.name) settings: \(error.localizedDescription)") }
 }
 
 let legacyRoot = home.appendingPathComponent(".claude/ronaldinho-pet", isDirectory: true)
@@ -84,21 +105,20 @@ let legacyCommands: Set<String> = [
     "\(legacyUpdate) waiting 'Needs your approval' '' true",
     "\(legacyUpdate) waiting 'Needs your input' '' true",
 ]
-let ownedCommands = (host == "claude" ? legacyCommands : []).union([ingest])
+let ownedCommands = (host.id == PetHosts.claude.id ? legacyCommands : []).union([ingest])
 
 var hooks = settings["hooks"] as? JSONDictionary ?? [:]
-let events = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest", "Notification", "Stop", "StopFailure", "SessionEnd"]
-for event in events { hooks[event] = groupsRemoving(commands: ownedCommands, from: hooks[event]) }
+if mode == "status" {
+    print(contains(command: ingest, in: hooks) ? "connected" : "disconnected")
+    exit(0)
+}
+for event in PetHosts.allHookEvents { hooks[event] = groupsRemoving(commands: ownedCommands, from: hooks[event]) }
 if mode == "install" {
-    add("SessionStart", command: ingest, hooks: &hooks)
-    add("UserPromptSubmit", command: ingest, hooks: &hooks)
-    add("PreToolUse", matcher: "*", command: ingest, hooks: &hooks)
-    add("PostToolUse", matcher: "*", command: ingest, hooks: &hooks)
-    add("PermissionRequest", matcher: "*", command: ingest, hooks: &hooks)
-    add("Notification", matcher: host == "claude" ? "permission_prompt|idle_prompt|agent_needs_input" : "*", command: ingest, hooks: &hooks)
-    add("Stop", command: ingest, hooks: &hooks)
-    add("StopFailure", matcher: "*", command: ingest, hooks: &hooks)
-    add("SessionEnd", command: ingest, hooks: &hooks)
+    let matchedEvents = Set(["PreToolUse", "PostToolUse", "PostToolUseFailure", "PostToolBatch", "PermissionRequest", "StopFailure", "Elicitation"])
+    for event in host.hookEvents {
+        let matcher = event == "Notification" ? host.notificationMatcher : (matchedEvents.contains(event) ? "*" : nil)
+        add(event, matcher: matcher, command: ingest, hooks: &hooks)
+    }
 }
 settings["hooks"] = hooks
 
@@ -128,14 +148,29 @@ do {
         try data.write(to: settingsURL, options: [.atomic])
         if let permissions = attributes?[.posixPermissions] { try? FileManager.default.setAttributes([.posixPermissions: permissions], ofItemAtPath: settingsURL.path) }
     }
-    if host == "claude" && mode == "install" {
+    if host.id == PetHosts.claude.id && mode == "install" {
         try FileManager.default.createDirectory(at: commandURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         if (try? String(contentsOf: commandURL, encoding: .utf8)) != petCommand {
             try petCommand.write(to: commandURL, atomically: true, encoding: .utf8)
         }
-    } else if host == "claude", (try? String(contentsOf: commandURL, encoding: .utf8)) == petCommand {
+    } else if host.id == PetHosts.claude.id, (try? String(contentsOf: commandURL, encoding: .utf8)) == petCommand {
         try FileManager.default.removeItem(at: commandURL)
     }
-} catch { fail("Unable to configure Claude: \(error.localizedDescription)") }
+    if host.id == PetHosts.codex.id && mode == "install" {
+        let resources = appURL.appendingPathComponent("Contents/Resources", isDirectory: true)
+        let codexHome = environment["CODEX_HOME"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+            ?? home.appendingPathComponent(".codex", isDirectory: true)
+        try replaceDirectory(
+            from: resources.appendingPathComponent("codex-pet", isDirectory: true),
+            to: home.appendingPathComponent(".codex/pets/ronaldinho-gaucho", isDirectory: true)
+        )
+        try replaceDirectory(
+            from: resources.appendingPathComponent("codex-skill/ronaldinho-pet", isDirectory: true),
+            to: codexHome.appendingPathComponent("skills/ronaldinho-pet", isDirectory: true)
+        )
+    }
+} catch { fail("Unable to configure \(host.name): \(error.localizedDescription)") }
 
-print("\(mode == "install" ? "Configured" : "Removed") Ronaldinho hooks for \(host).")
+print("\(mode == "install" ? "Configured" : "Removed") Ronaldinho hooks for \(host.id).")
+}
+}

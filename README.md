@@ -6,10 +6,26 @@ terminals do not overwrite each other.
 
 ## Install on macOS
 
+### Terminal — one command
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/felipefrf/ronaldinho-pet/main/install-remote.sh | zsh
+```
+
+This downloads the newest GitHub release, verifies its published SHA-256, and
+runs the same installer used by the DMG. It does not clone the repository or
+require Xcode.
+
+### Download
+
 Download the newest `macos-universal.dmg` from
 [Releases](https://github.com/felipefrf/ronaldinho-pet/releases), open it, and
-double-click **Install Ronaldinho Pet**. The prebuilt release works on Apple
+drag **RonaldinhoPet** to **Applications**. Open it and use **Connections** to
+connect Claude and Codex. The prebuilt release works on Apple
 Silicon and Intel Macs running macOS 13 or newer; Xcode is not required.
+
+After launch, right-click Ronaldinho and choose **Connections…** to connect or
+disconnect Claude and Codex without using the terminal.
 
 Until the app has a Developer ID signature, macOS may require **right-click →
 Open** the first time.
@@ -71,6 +87,12 @@ that work completed. Old terminal/unknown records are eligible for cleanup after
 Double-click **Uninstall Ronaldinho Pet** in the downloaded release, or run
 `./uninstall.sh` from a source checkout.
 
+From any terminal:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/felipefrf/ronaldinho-pet/main/install-remote.sh | zsh -s -- uninstall
+```
+
 Owned hooks are removed exactly; unrelated settings remain. The app, state, and
 native Codex pet are moved to Trash so removal is recoverable.
 
@@ -82,6 +104,13 @@ native Codex pet are moved to Trash so removal is recoverable.
 
 The test builds from scratch in an isolated HOME, stresses concurrent updates,
 installs twice, uninstalls, and checks that unknown hooks and settings survive.
+
+## Adding another host
+
+Hosts are compile-time adapters: one descriptor defines its name, settings file,
+bundle ID, and hook events; one adapter translates those events into the shared
+state model. The companion UI and hook installer read the same registry, so a
+new host does not require another pet or another state store.
 
 ## Current limitations
 

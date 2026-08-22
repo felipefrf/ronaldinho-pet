@@ -27,13 +27,22 @@ printf '%s\n' '{"session_id":"delegated","hook_event_name":"Stop","background_ta
 "$HELPER" inspect claude delegated | grep -q '"state":"running"'
 "$HELPER" inspect claude delegated | grep -q 'waiting for agents'
 
+# Subagent lifecycle keeps the parent active even when Stop omits background_tasks.
+printf '%s\n' '{"session_id":"tracked-agents","hook_event_name":"UserPromptSubmit"}' | "$HELPER" ingest claude
+printf '%s\n' '{"session_id":"tracked-agents","hook_event_name":"SubagentStart","agent_id":"worker-1"}' | "$HELPER" ingest claude
+printf '%s\n' '{"session_id":"tracked-agents","hook_event_name":"Stop"}' | "$HELPER" ingest claude
+"$HELPER" inspect claude tracked-agents | grep -q 'waiting for agents'
+printf '%s\n' '{"session_id":"tracked-agents","hook_event_name":"SubagentStop","agent_id":"worker-1"}' | "$HELPER" ingest claude
+printf '%s\n' '{"session_id":"tracked-agents","hook_event_name":"Stop"}' | "$HELPER" ingest claude
+"$HELPER" inspect claude tracked-agents | grep -q '"state":"completed"'
+
 # Activity arriving after Stop cannot reopen the completed turn.
 printf '%s\n' '{"session_id":"fixture-session","hook_event_name":"PostToolUse"}' | "$HELPER" ingest claude
 "$HELPER" inspect claude fixture-session | grep -q '"state":"completed"'
 
 # The same session id from another source gets another file.
 printf '%s\n' '{"session_id":"fixture-session","hook_event_name":"UserPromptSubmit"}' | "$HELPER" ingest codex
-test "$(find "$RONALDINHO_PET_ROOT/sessions" -type f -name '*.json' | wc -l | tr -d ' ')" = 3
+test "$(find "$RONALDINHO_PET_ROOT/sessions" -type f -name '*.json' | wc -l | tr -d ' ')" = 4
 "$HELPER" inspect codex fixture-session | grep -q 'Codex is thinking'
 "$HELPER" inspect codex fixture-session | grep -q '"applicationBundleID":"com.openai.codex"'
 
@@ -49,7 +58,7 @@ for _ in {1..100}; do
   printf '%s\n' '{"session_id":"concurrent","hook_event_name":"PostToolUse"}' | "$HELPER" ingest claude &
 done
 wait
-test "$("$HELPER" validate)" = 5
+test "$("$HELPER" validate)" = 6
 
 SDK_PATH="$(xcrun --show-sdk-path)"
 SDK_VERSION="$(xcrun --show-sdk-version)"
@@ -59,7 +68,7 @@ swiftc -sdk "$SDK_PATH" -target "$(uname -m)-apple-macosx${SDK_VERSION}" \
 "$TEST_ROOT/state-model-tests"
 
 swiftc -sdk "$SDK_PATH" -target "$(uname -m)-apple-macosx${SDK_VERSION}" \
-  "$ROOT/RonaldinhoPet/configure-hooks.swift" -o "$TEST_ROOT/configure-hooks"
+  "$ROOT/RonaldinhoPet/Host.swift" "$ROOT/RonaldinhoPet/configure-hooks.swift" -o "$TEST_ROOT/configure-hooks"
 mkdir -p "$RONALDINHO_CONFIG_HOME/.claude"
 printf '%s\n' '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"keep-me"}]}]},"secretLikeSetting":"preserved"}' \
   > "$RONALDINHO_CONFIG_HOME/.claude/settings.json"
@@ -78,22 +87,37 @@ FIRST_HASH="$(shasum -a 256 "$RONALDINHO_CONFIG_HOME/.claude/settings.json")"
 test "$FIRST_HASH" = "$(shasum -a 256 "$RONALDINHO_CONFIG_HOME/.claude/settings.json")"
 grep -q 'keep-me' "$RONALDINHO_CONFIG_HOME/.claude/settings.json"
 grep -q 'secretLikeSetting' "$RONALDINHO_CONFIG_HOME/.claude/settings.json"
-test "$(grep -c 'RonaldinhoPetState' "$RONALDINHO_CONFIG_HOME/.claude/settings.json")" = 9
+test "$("$TEST_ROOT/configure-hooks" "$INSTALL_ROOT" claude status)" = connected
 "$TEST_ROOT/configure-hooks" "$INSTALL_ROOT" codex install >/dev/null
-test "$(grep -c 'RonaldinhoPetState' "$RONALDINHO_CONFIG_HOME/.codex/hooks.json")" = 9
+test "$(grep -c 'RonaldinhoPetState' "$RONALDINHO_CONFIG_HOME/.claude/settings.json")" = 13
+test "$(grep -c 'RonaldinhoPetState' "$RONALDINHO_CONFIG_HOME/.codex/hooks.json")" = 14
 
 # A prebuilt release installs without invoking the source build.
 PREBUILT_ROOT="$TEST_ROOT/prebuilt"
 PREBUILT_HOME="$TEST_ROOT/prebuilt home"
 mkdir -p "$PREBUILT_ROOT" "$PREBUILT_HOME/.claude" "$PREBUILT_HOME/.codex"
 ditto "$RONALDINHO_BUILD_ROOT/RonaldinhoPet.app" "$PREBUILT_ROOT/RonaldinhoPet.app"
-cp "$TEST_ROOT/configure-hooks" "$PREBUILT_ROOT/configure-hooks"
-chmod +x "$PREBUILT_ROOT/configure-hooks"
 HOME="$PREBUILT_HOME" RONALDINHO_CONFIG_HOME="$PREBUILT_HOME" \
   RONALDINHO_PREBUILT_ROOT="$PREBUILT_ROOT" RONALDINHO_BUILD_ROOT="$TEST_ROOT/should-not-build" \
   RONALDINHO_SKIP_HOST_CHECK=true RONALDINHO_SKIP_LAUNCH=true zsh "$ROOT/install.sh" >/dev/null
 test -x "$PREBUILT_HOME/Library/Application Support/RonaldinhoPet/RonaldinhoPet.app/Contents/MacOS/RonaldinhoPet"
 test ! -e "$TEST_ROOT/should-not-build"
+
+# The public remote installer verifies and installs a release without clone/Xcode.
+REMOTE_RELEASE="$TEST_ROOT/remote-release"
+REMOTE_PACKAGE="$TEST_ROOT/remote package/Ronaldinho Pet"
+REMOTE_HOME="$TEST_ROOT/remote home"
+mkdir -p "$REMOTE_RELEASE" "$REMOTE_PACKAGE/prebuilt" "$REMOTE_PACKAGE/RonaldinhoPet" "$REMOTE_HOME/.claude" "$REMOTE_HOME/.codex"
+ditto "$RONALDINHO_BUILD_ROOT/RonaldinhoPet.app" "$REMOTE_PACKAGE/prebuilt/RonaldinhoPet.app"
+cp "$ROOT/install.sh" "$ROOT/uninstall.sh" "$REMOTE_PACKAGE/"
+cp "$ROOT/RonaldinhoPet/show-pet.sh" "$ROOT/RonaldinhoPet/spritesheet.webp" "$REMOTE_PACKAGE/RonaldinhoPet/"
+chmod +x "$REMOTE_PACKAGE"/*.sh
+ditto -c -k --keepParent "$REMOTE_PACKAGE" "$REMOTE_RELEASE/RonaldinhoPet-test-macos-universal.zip"
+(cd "$REMOTE_RELEASE" && shasum -a 256 RonaldinhoPet-test-macos-universal.zip > RonaldinhoPet-test-macos-universal.sha256)
+HOME="$REMOTE_HOME" RONALDINHO_CONFIG_HOME="$REMOTE_HOME" RONALDINHO_TAG=vtest \
+  RONALDINHO_DOWNLOAD_BASE="file://$REMOTE_RELEASE" RONALDINHO_SKIP_HOST_CHECK=true RONALDINHO_SKIP_LAUNCH=true \
+  zsh "$ROOT/install-remote.sh" >/dev/null
+test -x "$REMOTE_HOME/Library/Application Support/RonaldinhoPet/RonaldinhoPet.app/Contents/MacOS/RonaldinhoPet"
 
 # Exercise the public installer twice in an isolated home, then uninstall.
 PUBLIC_HOME="$TEST_ROOT/public home"

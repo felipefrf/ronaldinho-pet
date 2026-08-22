@@ -15,6 +15,7 @@ struct PetSnapshot: Codable, Equatable {
     var unread: Bool
     var receivedAt: Int64
     var lastActivityAt: Int64
+    var activeSubagentIDs: [String]?
 }
 
 struct PetAcknowledgement: Codable {

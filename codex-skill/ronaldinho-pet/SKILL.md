@@ -8,7 +8,7 @@ description: Show or reopen the installed Ronaldinho activity companion. Use whe
 Run exactly:
 
 ```sh
-"${HOME}/Library/Application Support/RonaldinhoPet/show-pet.sh"
+/usr/bin/open -b dev.felipefrf.ronaldinho-pet
 ```
 
 Report success briefly. If it fails, relay the installer error without replacing the command.

@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="${ROOT:h}"
 ASSET_PATH="${1:?Pass the Ronaldinho spritesheet path as the first argument.}"
 BUILD_ROOT="${RONALDINHO_BUILD_ROOT:-$ROOT/build}"
 APP_PATH="$BUILD_ROOT/RonaldinhoPet.app"
@@ -14,10 +15,18 @@ export CLANG_MODULE_CACHE_PATH="${CLANG_MODULE_CACHE_PATH:-${TMPDIR:-/tmp}/ronal
 
 rm -rf "$APP_PATH"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
-swiftc -sdk "$SDK_PATH" -target "$TARGET" -module-cache-path "$CLANG_MODULE_CACHE_PATH" "$ROOT/StateModel.swift" "$ROOT/main.swift" -o "$CONTENTS/MacOS/RonaldinhoPet" -framework Cocoa
-swiftc -sdk "$SDK_PATH" -target "$TARGET" -module-cache-path "$CLANG_MODULE_CACHE_PATH" "$ROOT/StateModel.swift" "$ROOT/state-tool.swift" -o "$CONTENTS/Resources/RonaldinhoPetState"
+swiftc -sdk "$SDK_PATH" -target "$TARGET" -module-cache-path "$CLANG_MODULE_CACHE_PATH" \
+  "$ROOT/StateModel.swift" "$ROOT/Host.swift" "$ROOT/HostAdapter.swift" "$ROOT/ConnectionsWindow.swift" "$ROOT/main.swift" \
+  -o "$CONTENTS/MacOS/RonaldinhoPet" -framework Cocoa
+swiftc -sdk "$SDK_PATH" -target "$TARGET" -module-cache-path "$CLANG_MODULE_CACHE_PATH" \
+  "$ROOT/StateModel.swift" "$ROOT/Host.swift" "$ROOT/HostAdapter.swift" "$ROOT/state-tool.swift" \
+  -o "$CONTENTS/Resources/RonaldinhoPetState"
+swiftc -sdk "$SDK_PATH" -target "$TARGET" -module-cache-path "$CLANG_MODULE_CACHE_PATH" \
+  "$ROOT/Host.swift" "$ROOT/configure-hooks.swift" \
+  -o "$CONTENTS/Resources/RonaldinhoConfigureHooks"
 cp "$ROOT/Info.plist" "$CONTENTS/Info.plist"
 cp "$ASSET_PATH" "$CONTENTS/Resources/spritesheet.webp"
-chmod +x "$CONTENTS/MacOS/RonaldinhoPet"
-chmod +x "$CONTENTS/Resources/RonaldinhoPetState"
+ditto "$PROJECT_ROOT/codex-pet" "$CONTENTS/Resources/codex-pet"
+ditto "$PROJECT_ROOT/codex-skill/ronaldinho-pet" "$CONTENTS/Resources/codex-skill/ronaldinho-pet"
+chmod +x "$CONTENTS/MacOS/RonaldinhoPet" "$CONTENTS/Resources/RonaldinhoPetState" "$CONTENTS/Resources/RonaldinhoConfigureHooks"
 echo "$APP_PATH"
