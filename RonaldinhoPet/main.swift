@@ -488,17 +488,30 @@ private final class PetView: NSView {
         let menu = NSMenu()
         let resetItem = menu.addItem(withTitle: "Reset position", action: #selector(AppDelegate.resetPosition), keyEquivalent: "")
         resetItem.target = NSApp.delegate as? AppDelegate
-        let sizeMenu = NSMenu()
-        for (title, action) in [
-            ("Small", #selector(AppDelegate.useSmallSize)),
-            ("Medium", #selector(AppDelegate.useMediumSize)),
-            ("Large", #selector(AppDelegate.useLargeSize)),
-        ] {
-            let item = sizeMenu.addItem(withTitle: title, action: action, keyEquivalent: "")
-            item.target = NSApp.delegate as? AppDelegate
-        }
-        let sizeItem = menu.addItem(withTitle: "Pet size", action: nil, keyEquivalent: "")
-        menu.setSubmenu(sizeMenu, for: sizeItem)
+
+        let sizeControl = NSView(frame: NSRect(x: 0, y: 0, width: 240, height: 48))
+        let label = NSTextField(labelWithString: "Pet size")
+        label.frame = NSRect(x: 12, y: 27, width: 216, height: 16)
+        label.font = .menuFont(ofSize: 0)
+        sizeControl.addSubview(label)
+
+        let storedScale = UserDefaults.standard.double(forKey: "petScale")
+        let slider = NSSlider(
+            value: storedScale == 0 ? 0.60 : storedScale,
+            minValue: 0.25,
+            maxValue: 1.20,
+            target: NSApp.delegate as? AppDelegate,
+            action: #selector(AppDelegate.changePetSize(_:))
+        )
+        slider.frame = NSRect(x: 12, y: 4, width: 216, height: 20)
+        slider.isContinuous = true
+        slider.controlSize = .small
+        slider.setAccessibilityLabel("Pet size")
+        sizeControl.addSubview(slider)
+
+        let sizeItem = NSMenuItem()
+        sizeItem.view = sizeControl
+        menu.addItem(sizeItem)
         menu.addItem(.separator())
         let quitItem = menu.addItem(withTitle: "Quit Ronaldinho companion", action: #selector(AppDelegate.quit), keyEquivalent: "q")
         quitItem.target = NSApp.delegate as? AppDelegate
@@ -624,9 +637,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.setFrame(frame, display: true, animate: false)
     }
 
-    @objc func useSmallSize() { setPetScale(0.35) }
-    @objc func useMediumSize() { setPetScale(0.80) }
-    @objc func useLargeSize() { setPetScale(1.0) }
+    @objc func changePetSize(_ sender: NSSlider) {
+        setPetScale(CGFloat(sender.doubleValue))
+    }
 
     @objc func quit() {
         NSApp.terminate(nil)

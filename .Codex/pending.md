@@ -5,6 +5,7 @@
 - [x] Adicionar tamanho persistente ao companion — oferecer Small/Medium/Large no menu sem afetar o tamanho configurado no Codex App.
 - [x] Diferenciar conclusão real de espera por sub-agentes — um `Stop` com `background_tasks` ativos não pode gerar “Finished”; manter como execução delegada e reconhecer alertas quando o terminal ganhar foco.
 - [x] Fazer o tamanho responder ao scroll na janela não-ativável — observar o scroll global apenas enquanto o cursor estiver sobre o companion e persistir a escala.
+- [x] Substituir os três presets de tamanho por um slider contínuo arrastável no menu do companion.
 - [x] Corrigir `/pet` bloqueado pelo macOS — deixar o comando Claude usar `open` diretamente e remover `quarantine` somente dos artefatos instalados.
 - [x] Remover duplicação visual transitória — redimensionamentos concorrentes mantinham snapshots antigos da janela; aplicar mudanças de frame sem animação.
 - [ ] Assinar e notarizar o release universal — não há identidade Developer ID no Keychain nem secrets Apple no GitHub; obter certificado/credenciais e adicionar a etapa de notarização antes do release estável.

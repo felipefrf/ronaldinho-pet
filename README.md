@@ -37,8 +37,8 @@ There are two intentional surfaces using the same sprite asset:
 - the Codex App native pet lives inside Codex and its size is controlled under
   **Settings → Pets → Appearance → Pet size**;
 - the floating companion combines Claude and Codex activity. Right-click it and
-  choose **Pet size → Small / Medium / Large**, or scroll anywhere over the
-  companion for continuous sizing. This choice is persisted.
+  drag the **Pet size** slider, or scroll anywhere over the companion for
+  continuous sizing. This choice is persisted.
 
 The compact bar always shows Claude and Codex independently, including active
 and finished counts. Click it to expand the fixed row for each host.
