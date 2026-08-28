@@ -13,6 +13,11 @@ export CLANG_MODULE_CACHE_PATH="$TEST_ROOT/module-cache"
 
 zsh "$ROOT/RonaldinhoPet/build-app.sh" "$ROOT/RonaldinhoPet/spritesheet.webp" >/dev/null
 HELPER="$RONALDINHO_BUILD_ROOT/RonaldinhoPet.app/Contents/Resources/RonaldinhoPetState"
+KING_ANIMATIONS="$RONALDINHO_BUILD_ROOT/RonaldinhoPet.app/Contents/Resources/pets/king-23/animations"
+test "$(find "$KING_ANIMATIONS" -type f -name '*.png' | wc -l | tr -d ' ')" = 9
+for animation in "$KING_ANIMATIONS"/*.png; do
+  sips -g hasAlpha "$animation" | grep -q 'hasAlpha: yes'
+done
 
 for fixture in claude-session-start claude-prompt claude-permission claude-stop; do
   "$HELPER" ingest claude < "$ROOT/tests/fixtures/${fixture}.json"

@@ -56,6 +56,9 @@ There are two intentional surfaces using the same sprite asset:
   drag the **Pet size** slider, or scroll anywhere over the companion for
   continuous sizing. This choice is persisted.
 
+Right-click the floating companion and use **Pet** to switch between
+**Ronaldinho** and the original basketball companion **King 23**.
+
 The compact bar always shows Claude and Codex independently, including active
 and finished counts. Click it to expand the fixed row for each host.
 

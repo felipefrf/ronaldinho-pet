@@ -1,10 +1,25 @@
 import Cocoa
 
+private struct CompanionPet {
+    let id: String
+    let name: String
+    let resource: String
+    let animationDirectory: String?
+
+    static let all = [
+        CompanionPet(id: "ronaldinho", name: "Ronaldinho", resource: "spritesheet.webp", animationDirectory: nil),
+        CompanionPet(id: "king-23", name: "King 23", resource: "pets/king-23/animations/idle.png", animationDirectory: "pets/king-23/animations"),
+    ]
+
+    static func pet(id: String?) -> CompanionPet { all.first { $0.id == id } ?? all[0] }
+}
+
 private final class PetView: NSView {
     private let cellWidth: CGFloat = 192
     private let cellHeight: CGFloat = 208
     private let stateRootURL: URL
-    private let spriteSheet: NSImage?
+    private var spriteSheet: NSImage?
+    private var animationSheets: [String: NSImage] = [:]
     private let animationSpecs: [String: (row: Int, frames: Int)] = [
         "idle": (0, 7),
         "running-right": (1, 8),
@@ -43,7 +58,8 @@ private final class PetView: NSView {
 
     init(
         frame: NSRect,
-        spriteSheetURL: URL?,
+        pet: CompanionPet,
+        resourceRootURL: URL?,
         stateRootURL: URL,
         activateSession: @escaping (String) -> Bool,
         adjustPetScale: @escaping (CGFloat) -> Void,
@@ -51,12 +67,13 @@ private final class PetView: NSView {
         acknowledgeStatus: @escaping (PetSnapshot) -> Void
     ) {
         self.stateRootURL = stateRootURL
-        self.spriteSheet = spriteSheetURL.flatMap(NSImage.init(contentsOf:))
+        self.spriteSheet = nil
         self.activateSession = activateSession
         self.adjustPetScale = adjustPetScale
         self.setStatusPanelExpanded = setStatusPanelExpanded
         self.acknowledgeStatus = acknowledgeStatus
         super.init(frame: frame)
+        load(pet, from: resourceRootURL)
         wantsLayer = true
         layer?.backgroundColor = NSColor.clear.cgColor
         readState()
@@ -76,6 +93,29 @@ private final class PetView: NSView {
     deinit {
         animationTimer?.invalidate()
         stateTimer?.invalidate()
+    }
+
+    private func load(_ pet: CompanionPet, from resourceRootURL: URL?) {
+        animationSheets.removeAll()
+        guard let resourceRootURL else {
+            spriteSheet = nil
+            return
+        }
+        if let directory = pet.animationDirectory {
+            spriteSheet = nil
+            for state in animationSpecs.keys {
+                let url = resourceRootURL.appendingPathComponent(directory).appendingPathComponent("\(state).png")
+                animationSheets[state] = NSImage(contentsOf: url)
+            }
+        } else {
+            spriteSheet = NSImage(contentsOf: resourceRootURL.appendingPathComponent(pet.resource))
+        }
+    }
+
+    func selectPet(_ pet: CompanionPet, from resourceRootURL: URL?) {
+        load(pet, from: resourceRootURL)
+        frameIndex = 0
+        needsDisplay = true
     }
 
     private func normalizedState(_ value: String?) -> String {
@@ -129,13 +169,20 @@ private final class PetView: NSView {
             .filter { $0.state != "ended" }
             .sorted { $0.receivedAt > $1.receivedAt }
 
-        let nextState = normalizedState(decoded.state == "completed" || decoded.state == "ended" || decoded.state == "stale" ? "idle" : decoded.state)
+        let terminalUnread = decoded.unread && !PetStore.isAcknowledged(decoded, root: stateRootURL)
+        let visualState: String
+        if decoded.state == "completed" || decoded.state == "ended" {
+            visualState = terminalUnread ? "waving" : "idle"
+        } else {
+            visualState = decoded.state == "stale" ? "idle" : decoded.state
+        }
+        let nextState = normalizedState(visualState)
         if nextState != state {
             state = nextState
             if interactionState == nil {
                 frameIndex = 0
             }
-            if nextState == "idle" {
+            if nextState == "idle" || nextState == "waving" {
                 setStatusExpanded(false)
             } else if nextState == "waiting" {
                 setStatusExpanded(true)
@@ -374,7 +421,8 @@ private final class PetView: NSView {
         NSColor.clear.setFill()
         dirtyRect.fill()
 
-        guard let spriteSheet, let animation = animationSpecs[displayedState] else {
+        guard let animation = animationSpecs[displayedState],
+              let spriteSheet = animationSheets[displayedState] ?? spriteSheet else {
             let label = "Ronaldinho pet asset missing"
             let attributes: [NSAttributedString.Key: Any] = [
                 .foregroundColor: NSColor.white,
@@ -384,13 +432,24 @@ private final class PetView: NSView {
             return
         }
 
-        let sheetHeight = spriteSheet.size.height
-        let sourceRect = NSRect(
-            x: CGFloat(frameIndex) * cellWidth,
-            y: sheetHeight - CGFloat(animation.row + 1) * cellHeight,
-            width: cellWidth,
-            height: cellHeight
-        )
+        let sourceRect: NSRect
+        if animationSheets[displayedState] != nil {
+            let width = spriteSheet.size.width / 4
+            let height = spriteSheet.size.height / 2
+            sourceRect = NSRect(
+                x: CGFloat(frameIndex % 4) * width,
+                y: spriteSheet.size.height - CGFloat(frameIndex / 4 + 1) * height,
+                width: width,
+                height: height
+            )
+        } else {
+            sourceRect = NSRect(
+                x: CGFloat(frameIndex) * cellWidth,
+                y: spriteSheet.size.height - CGFloat(animation.row + 1) * cellHeight,
+                width: cellWidth,
+                height: cellHeight
+            )
+        }
         spriteSheet.draw(
             in: petRect,
             from: sourceRect,
@@ -492,6 +551,17 @@ private final class PetView: NSView {
         let connectionsItem = menu.addItem(withTitle: "Connections…", action: #selector(AppDelegate.showConnections), keyEquivalent: "")
         connectionsItem.target = NSApp.delegate as? AppDelegate
 
+        let selectedPet = CompanionPet.pet(id: UserDefaults.standard.string(forKey: "petID"))
+        let petsMenu = NSMenu()
+        for pet in CompanionPet.all {
+            let item = petsMenu.addItem(withTitle: pet.name, action: #selector(AppDelegate.changePet(_:)), keyEquivalent: "")
+            item.target = NSApp.delegate as? AppDelegate
+            item.representedObject = pet.id
+            item.state = pet.id == selectedPet.id ? .on : .off
+        }
+        let petsItem = menu.addItem(withTitle: "Pet", action: nil, keyEquivalent: "")
+        petsItem.submenu = petsMenu
+
         let sizeControl = NSView(frame: NSRect(x: 0, y: 0, width: 240, height: 48))
         let label = NSTextField(labelWithString: "Pet size")
         label.frame = NSRect(x: 12, y: 27, width: 216, height: 16)
@@ -533,7 +603,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let spriteSheetURL = Bundle.main.url(forResource: "spritesheet", withExtension: "webp")
+        let selectedPet = CompanionPet.pet(id: UserDefaults.standard.string(forKey: "petID"))
         let rect = initialFrame()
         let panel = NSPanel(
             contentRect: rect,
@@ -549,7 +619,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.hidesOnDeactivate = false
         panel.contentView = PetView(
             frame: NSRect(origin: .zero, size: rect.size),
-            spriteSheetURL: spriteSheetURL,
+            pet: selectedPet,
+            resourceRootURL: Bundle.main.resourceURL,
             stateRootURL: companionDirectory,
             activateSession: { [weak self] bundleID in
                 self?.activateSession(bundleID: bundleID) ?? false
@@ -646,6 +717,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func changePetSize(_ sender: NSSlider) {
         setPetScale(CGFloat(sender.doubleValue))
+    }
+
+    @objc func changePet(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String,
+              let pet = CompanionPet.all.first(where: { $0.id == id }) else { return }
+        UserDefaults.standard.set(id, forKey: "petID")
+        (panel?.contentView as? PetView)?.selectPet(pet, from: Bundle.main.resourceURL)
     }
 
     @objc func showConnections() {

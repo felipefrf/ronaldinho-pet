@@ -26,6 +26,7 @@ swiftc -sdk "$SDK_PATH" -target "$TARGET" -module-cache-path "$CLANG_MODULE_CACH
   -o "$CONTENTS/Resources/RonaldinhoConfigureHooks"
 cp "$ROOT/Info.plist" "$CONTENTS/Info.plist"
 cp "$ASSET_PATH" "$CONTENTS/Resources/spritesheet.webp"
+ditto "$PROJECT_ROOT/pets" "$CONTENTS/Resources/pets"
 ditto "$PROJECT_ROOT/codex-pet" "$CONTENTS/Resources/codex-pet"
 ditto "$PROJECT_ROOT/codex-skill/ronaldinho-pet" "$CONTENTS/Resources/codex-skill/ronaldinho-pet"
 chmod +x "$CONTENTS/MacOS/RonaldinhoPet" "$CONTENTS/Resources/RonaldinhoPetState" "$CONTENTS/Resources/RonaldinhoConfigureHooks"

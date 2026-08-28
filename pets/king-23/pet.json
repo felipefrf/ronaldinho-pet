@@ -1,0 +1,16 @@
+{
+  "displayName": "King 23",
+  "description": "An original golden-yellow basketball companion.",
+  "layout": "animation-atlases-4x2",
+  "states": {
+    "idle": "animations/idle.png",
+    "running-right": "animations/running-right.png",
+    "running-left": "animations/running-left.png",
+    "waving": "animations/waving.png",
+    "jumping": "animations/jumping.png",
+    "failed": "animations/failed.png",
+    "waiting": "animations/waiting.png",
+    "running": "animations/running.png",
+    "review": "animations/review.png"
+  }
+}
