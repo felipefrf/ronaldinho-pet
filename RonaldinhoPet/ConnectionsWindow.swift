@@ -18,7 +18,7 @@ final class ConnectionsWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        window.title = "Ronaldinho Pet"
+        window.title = "Player Companions"
         window.isReleasedWhenClosed = false
         window.center()
         super.init(window: window)
@@ -47,7 +47,7 @@ final class ConnectionsWindowController: NSWindowController {
         title.textColor = accent
         content.addSubview(title)
 
-        let subtitle = NSTextField(labelWithString: "Choose which apps Ronaldinho should watch.")
+        let subtitle = NSTextField(labelWithString: "Choose which apps your companions should watch.")
         subtitle.frame = NSRect(x: 24, y: 160, width: 360, height: 20)
         subtitle.textColor = .white.withAlphaComponent(0.72)
         content.addSubview(subtitle)
@@ -120,7 +120,7 @@ final class ConnectionsWindowController: NSWindowController {
     @discardableResult
     private func run(host: PetHost, mode: String) throws -> String {
         guard let executable = Bundle.main.url(forResource: "RonaldinhoConfigureHooks", withExtension: nil) else {
-            throw NSError(domain: "RonaldinhoPet", code: 1, userInfo: [NSLocalizedDescriptionKey: "Connection helper is missing. Reinstall Ronaldinho Pet."])
+            throw NSError(domain: "RonaldinhoPet", code: 1, userInfo: [NSLocalizedDescriptionKey: "Connection helper is missing. Reinstall Player Companions."])
         }
         let process = Process()
         let output = Pipe()

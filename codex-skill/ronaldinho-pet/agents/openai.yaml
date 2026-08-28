@@ -1,6 +1,6 @@
 interface:
-  display_name: "Ronaldinho Pet"
-  short_description: "Show the Ronaldinho activity companion"
-  default_prompt: "Use $ronaldinho-pet to show my Ronaldinho activity companion."
+  display_name: "Player Companions"
+  short_description: "Show the activity companion app"
+  default_prompt: "Use $ronaldinho-pet to show Player Companions."
 policy:
   allow_implicit_invocation: false

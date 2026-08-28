@@ -1,8 +1,8 @@
-# Ronaldinho Pet
+# Player Companions
 
-A small macOS companion for Claude Code, Claude Desktop, Codex CLI, and Codex
-App. It uses native hooks and keeps one state file per session, so concurrent
-terminals do not overwrite each other.
+A small macOS companion platform for Claude Code, Claude Desktop, Codex CLI,
+and Codex App. Choose a player pet while native hooks keep concurrent sessions
+visible without overwriting one another.
 
 ## Install on macOS
 
@@ -24,7 +24,7 @@ drag **RonaldinhoPet** to **Applications**. Open it and use **Connections** to
 connect Claude and Codex. The prebuilt release works on Apple
 Silicon and Intel Macs running macOS 13 or newer; Xcode is not required.
 
-After launch, right-click Ronaldinho and choose **Connections…** to connect or
+After launch, right-click the companion and choose **Connections…** to connect or
 disconnect Claude and Codex without using the terminal.
 
 Until the app has a Developer ID signature, macOS may require **right-click →

@@ -1,9 +1,9 @@
 ---
 name: ronaldinho-pet
-description: Show or reopen the installed Ronaldinho activity companion. Use when the user invokes $ronaldinho-pet or asks Codex to show, open, or summon Ronaldinho Pet.
+description: Show or reopen Player Companions. Use when the user invokes $ronaldinho-pet or asks Codex to show, open, or summon the companion app.
 ---
 
-# Ronaldinho Pet
+# Player Companions
 
 Run exactly:
 

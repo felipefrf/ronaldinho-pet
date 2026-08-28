@@ -47,7 +47,7 @@ private func ingest(source: String) {
     guard let input = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
           let sessionID = string(input, "session_id"),
           let event = string(input, "hook_event_name") else {
-        FileHandle.standardError.write(Data("Ronaldinho Pet ignored a hook without session_id/hook_event_name.\n".utf8))
+        FileHandle.standardError.write(Data("Player Companions ignored a hook without session_id/hook_event_name.\n".utf8))
         return
     }
 

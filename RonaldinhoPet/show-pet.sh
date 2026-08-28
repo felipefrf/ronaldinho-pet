@@ -7,10 +7,10 @@ if [ ! -x "$APP_PATH/Contents/MacOS/RonaldinhoPet" ] && [ -x "/Applications/Rona
 fi
 
 if [ ! -x "$APP_PATH/Contents/MacOS/RonaldinhoPet" ]; then
-  echo "Ronaldinho companion is not installed." >&2
+  echo "Player Companions is not installed." >&2
   exit 1
 fi
 
 /usr/bin/open -a "$APP_PATH"
 
-echo "Ronaldinho companion is ready."
+echo "Player Companions is ready."

@@ -7,7 +7,7 @@ ACTION="${1:-install}"
   exit 1
 }
 [[ "$(uname -s)" == Darwin ]] || {
-  echo "Ronaldinho Pet currently supports macOS only." >&2
+  echo "Player Companions currently supports macOS only." >&2
   exit 1
 }
 
@@ -28,7 +28,7 @@ ARCHIVE="RonaldinhoPet-$VERSION-macos-universal.zip"
 CHECKSUMS="RonaldinhoPet-$VERSION-macos-universal.sha256"
 BASE_URL="${RONALDINHO_DOWNLOAD_BASE:-https://github.com/$REPOSITORY/releases/download/$TAG}"
 
-echo "Downloading Ronaldinho Pet $TAG…"
+echo "Downloading Player Companions $TAG…"
 /usr/bin/curl -fsSL "$BASE_URL/$ARCHIVE" -o "$STAGE/$ARCHIVE"
 /usr/bin/curl -fsSL "$BASE_URL/$CHECKSUMS" -o "$STAGE/$CHECKSUMS"
 EXPECTED="$(awk -v archive="$ARCHIVE" '$2 == archive { print $1; exit }' "$STAGE/$CHECKSUMS")"

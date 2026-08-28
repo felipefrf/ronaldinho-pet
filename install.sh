@@ -58,7 +58,7 @@ rollback() {
 trap rollback EXIT INT TERM
 
 if [ "$(uname -s)" != Darwin ]; then
-  echo "Ronaldinho Pet supports macOS only." >&2
+  echo "Player Companions supports macOS only." >&2
   exit 1
 fi
 if [ ! -f "$SOURCE/spritesheet.webp" ]; then
@@ -68,7 +68,7 @@ fi
 if [ "${RONALDINHO_SKIP_HOST_CHECK:-false}" != true ] \
   && ! command -v claude >/dev/null 2>&1 && [ ! -d /Applications/Claude.app ] \
   && ! command -v codex >/dev/null 2>&1 && [ ! -d /Applications/ChatGPT.app ] && [ ! -d /Applications/Codex.app ]; then
-  echo "Install Claude or Codex before enabling Ronaldinho Pet." >&2
+  echo "Install Claude or Codex before enabling Player Companions." >&2
   exit 1
 fi
 
@@ -112,7 +112,7 @@ if [ "${RONALDINHO_SKIP_LAUNCH:-false}" != true ]; then
   open -a "$TARGET_APP" || echo "Installed, but macOS did not launch the pet. Open $TARGET_APP manually." >&2
 fi
 
-echo "Ronaldinho Pet installed. If Codex asks, trust only the RonaldinhoPetState hook commands."
+echo "Player Companions installed. If Codex asks, trust only the RonaldinhoPetState hook commands."
 echo "Then restart Claude and Codex so they reload the hooks."
 echo "In Codex App, open Settings → Pets → Refresh to select the native pet."
 echo "Run \$ronaldinho-pet in Codex App or CLI to show the floating companion."

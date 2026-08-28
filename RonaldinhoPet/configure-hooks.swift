@@ -124,13 +124,13 @@ settings["hooks"] = hooks
 
 let petCommand = """
 ---
-description: Show the Ronaldinho companion pet.
+description: Show Player Companions.
 allowed-tools: Bash(/usr/bin/open:*)
 ---
 
 !`/usr/bin/open -a \(shellQuote(app))`
 
-Ronaldinho companion is ready.
+Player Companions is ready.
 """
 
 do {
@@ -171,6 +171,6 @@ do {
     }
 } catch { fail("Unable to configure \(host.name): \(error.localizedDescription)") }
 
-print("\(mode == "install" ? "Configured" : "Removed") Ronaldinho hooks for \(host.id).")
+print("\(mode == "install" ? "Configured" : "Removed") Player Companions hooks for \(host.id).")
 }
 }

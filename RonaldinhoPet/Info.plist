@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
   <key>CFBundleDisplayName</key>
-  <string>Ronaldinho Pet</string>
+  <string>Player Companions</string>
   <key>CFBundleExecutable</key>
   <string>RonaldinhoPet</string>
   <key>CFBundleIdentifier</key>
   <string>dev.felipefrf.ronaldinho-pet</string>
   <key>CFBundleName</key>
-  <string>Ronaldinho Pet</string>
+  <string>Player Companions</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>

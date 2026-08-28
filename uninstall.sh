@@ -37,4 +37,4 @@ if [ -d "$CODEX_SKILL" ] && diff -qr "$ROOT/codex-skill/ronaldinho-pet" "$CODEX_
   mkdir -p "${HOME}/.Trash"
   mv "$CODEX_SKILL" "${HOME}/.Trash/ronaldinho-pet-skill-$(date +%Y%m%d-%H%M%S)"
 fi
-echo "Ronaldinho Pet uninstalled. Restart Claude Code/Desktop to reload hooks."
+echo "Player Companions uninstalled. Restart Claude Code/Desktop to reload hooks."

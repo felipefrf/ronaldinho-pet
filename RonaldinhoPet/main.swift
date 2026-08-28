@@ -1,5 +1,13 @@
 import Cocoa
 
+private let minimumPetScale: CGFloat = 0.20
+private let maximumPetScale: CGFloat = 1.00
+private let defaultPetScale: CGFloat = 0.60
+
+private func clampedPetScale(_ scale: CGFloat) -> CGFloat {
+    min(maximumPetScale, max(minimumPetScale, scale))
+}
+
 private struct CompanionPet {
     let id: String
     let name: String
@@ -15,11 +23,17 @@ private struct CompanionPet {
 }
 
 private final class PetView: NSView {
+    private struct AnimationGeometry {
+        let cellSize: NSSize
+        let contentBounds: NSRect
+    }
+
     private let cellWidth: CGFloat = 192
     private let cellHeight: CGFloat = 208
     private let stateRootURL: URL
     private var spriteSheet: NSImage?
     private var animationSheets: [String: NSImage] = [:]
+    private var animationGeometry: [String: AnimationGeometry] = [:]
     private let animationSpecs: [String: (row: Int, frames: Int)] = [
         "idle": (0, 7),
         "running-right": (1, 8),
@@ -97,6 +111,7 @@ private final class PetView: NSView {
 
     private func load(_ pet: CompanionPet, from resourceRootURL: URL?) {
         animationSheets.removeAll()
+        animationGeometry.removeAll()
         guard let resourceRootURL else {
             spriteSheet = nil
             return
@@ -105,11 +120,69 @@ private final class PetView: NSView {
             spriteSheet = nil
             for state in animationSpecs.keys {
                 let url = resourceRootURL.appendingPathComponent(directory).appendingPathComponent("\(state).png")
-                animationSheets[state] = NSImage(contentsOf: url)
+                guard let image = NSImage(contentsOf: url), let animation = animationSpecs[state] else { continue }
+                animationSheets[state] = image
+                let size = NSSize(width: image.size.width / 4, height: image.size.height / 2)
+                if let bounds = alphaBounds(in: image, cellSize: size, frames: animation.frames, fixedRow: nil) {
+                    animationGeometry[state] = AnimationGeometry(cellSize: size, contentBounds: bounds)
+                }
             }
         } else {
             spriteSheet = NSImage(contentsOf: resourceRootURL.appendingPathComponent(pet.resource))
+            if let spriteSheet {
+                let size = NSSize(width: cellWidth, height: cellHeight)
+                for (state, animation) in animationSpecs {
+                    if let bounds = alphaBounds(in: spriteSheet, cellSize: size, frames: animation.frames, fixedRow: animation.row) {
+                        animationGeometry[state] = AnimationGeometry(cellSize: size, contentBounds: bounds)
+                    }
+                }
+            }
         }
+    }
+
+    private func alphaBounds(
+        in image: NSImage,
+        cellSize: NSSize,
+        frames: Int,
+        fixedRow: Int?
+    ) -> NSRect? {
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        let width = cgImage.width
+        let height = cgImage.height
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        guard let pixels = context.data?.assumingMemoryBound(to: UInt8.self) else { return nil }
+
+        let cellWidth = Int(cellSize.width)
+        let cellHeight = Int(cellSize.height)
+        var minX = cellWidth
+        var minY = cellHeight
+        var maxX = 0
+        var maxY = 0
+        for frame in 0..<frames {
+            let column = fixedRow == nil ? frame % 4 : frame
+            let row = fixedRow ?? frame / 4
+            let originX = column * cellWidth
+            let originY = row * cellHeight
+            for y in 0..<cellHeight {
+                for x in 0..<cellWidth where pixels[(originY + y) * width * 4 + (originX + x) * 4 + 3] > 8 {
+                    minX = min(minX, x)
+                    minY = min(minY, y)
+                    maxX = max(maxX, x + 1)
+                    maxY = max(maxY, y + 1)
+                }
+            }
+        }
+        guard minX < maxX, minY < maxY else { return nil }
+        return NSRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
     }
 
     func selectPet(_ pet: CompanionPet, from resourceRootURL: URL?) {
@@ -423,7 +496,7 @@ private final class PetView: NSView {
 
         guard let animation = animationSpecs[displayedState],
               let spriteSheet = animationSheets[displayedState] ?? spriteSheet else {
-            let label = "Ronaldinho pet asset missing"
+            let label = "Companion asset missing"
             let attributes: [NSAttributedString.Key: Any] = [
                 .foregroundColor: NSColor.white,
                 .font: NSFont.systemFont(ofSize: 13, weight: .medium),
@@ -450,8 +523,24 @@ private final class PetView: NSView {
                 height: cellHeight
             )
         }
+        let destinationRect: NSRect
+        if let geometry = animationGeometry[displayedState] {
+            let target = petRect.insetBy(dx: 0, dy: petRect.height * 0.04)
+            let scale = min(
+                target.width / geometry.contentBounds.width,
+                target.height / geometry.contentBounds.height
+            )
+            destinationRect = NSRect(
+                x: target.midX - geometry.contentBounds.midX * scale,
+                y: target.midY - geometry.contentBounds.midY * scale,
+                width: geometry.cellSize.width * scale,
+                height: geometry.cellSize.height * scale
+            )
+        } else {
+            destinationRect = petRect
+        }
         spriteSheet.draw(
-            in: petRect,
+            in: destinationRect,
             from: sourceRect,
             operation: .sourceOver,
             fraction: 1,
@@ -570,9 +659,9 @@ private final class PetView: NSView {
 
         let storedScale = UserDefaults.standard.double(forKey: "petScale")
         let slider = NSSlider(
-            value: storedScale == 0 ? 0.60 : storedScale,
-            minValue: 0.25,
-            maxValue: 1.20,
+            value: Double(clampedPetScale(storedScale == 0 ? defaultPetScale : CGFloat(storedScale))),
+            minValue: Double(minimumPetScale),
+            maxValue: Double(maximumPetScale),
             target: NSApp.delegate as? AppDelegate,
             action: #selector(AppDelegate.changePetSize(_:))
         )
@@ -586,7 +675,7 @@ private final class PetView: NSView {
         sizeItem.view = sizeControl
         menu.addItem(sizeItem)
         menu.addItem(.separator())
-        let quitItem = menu.addItem(withTitle: "Quit Ronaldinho companion", action: #selector(AppDelegate.quit), keyEquivalent: "q")
+        let quitItem = menu.addItem(withTitle: "Quit Player Companions", action: #selector(AppDelegate.quit), keyEquivalent: "q")
         quitItem.target = NSApp.delegate as? AppDelegate
         NSMenu.popUpContextMenu(menu, with: event, for: self)
     }
@@ -599,7 +688,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var connectionsWindow = ConnectionsWindowController()
     private var petScale: CGFloat {
         let stored = UserDefaults.standard.double(forKey: "petScale")
-        return stored == 0 ? 0.60 : CGFloat(stored)
+        return clampedPetScale(stored == 0 ? defaultPetScale : CGFloat(stored))
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -626,7 +715,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.activateSession(bundleID: bundleID) ?? false
             },
             adjustPetScale: { [weak self] delta in
-                self?.setPetScale((self?.petScale ?? 0.35) + delta)
+                self?.setPetScale((self?.petScale ?? defaultPetScale) + delta, anchoredAt: NSEvent.mouseLocation)
             },
             setStatusPanelExpanded: { [weak self] expanded in
                 self?.setStatusPanelExpanded(expanded)
@@ -639,7 +728,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.panel = panel
         globalScrollMonitor = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self, weak panel] event in
             guard let self, let panel, panel.frame.contains(NSEvent.mouseLocation), event.scrollingDeltaY != 0 else { return }
-            self.setPetScale(self.petScale + max(-0.10, min(0.10, event.scrollingDeltaY * 0.01)))
+            self.setPetScale(
+                self.petScale + max(-0.10, min(0.10, event.scrollingDeltaY * 0.01)),
+                anchoredAt: NSEvent.mouseLocation
+            )
         }
         if !connectionsWindow.hasConnectedHost {
             DispatchQueue.main.async { [weak self] in self?.showConnections() }
@@ -703,15 +795,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel?.setFrame(initialFrame(statusExpanded: expanded), display: true, animate: false)
     }
 
-    private func setPetScale(_ scale: CGFloat) {
+    private func setPetScale(_ proposedScale: CGFloat, anchoredAt anchor: NSPoint? = nil) {
         guard let panel else { return }
-        let scale = min(1.20, max(0.25, scale))
+        let scale = clampedPetScale(proposedScale)
         let expanded = panel.frame.height > 260 * petScale + 26
+        let oldFrame = panel.frame
         UserDefaults.standard.set(Double(scale), forKey: "petScale")
-        let topRight = NSPoint(x: panel.frame.maxX, y: panel.frame.maxY)
-        var frame = panel.frame
+        let anchor = anchor ?? NSPoint(x: oldFrame.maxX, y: oldFrame.maxY)
+        let relativeX = (anchor.x - oldFrame.minX) / oldFrame.width
+        let relativeY = (anchor.y - oldFrame.minY) / oldFrame.height
+        var frame = oldFrame
         frame.size = panelSize(statusExpanded: expanded)
-        frame.origin = NSPoint(x: topRight.x - frame.width, y: topRight.y - frame.height)
+        frame.origin = NSPoint(
+            x: anchor.x - relativeX * frame.width,
+            y: anchor.y - relativeY * frame.height
+        )
         panel.setFrame(frame, display: true, animate: false)
     }
 
