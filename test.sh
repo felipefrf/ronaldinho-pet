@@ -12,6 +12,10 @@ export RONALDINHO_BUILD_ROOT="$TEST_ROOT/build"
 export CLANG_MODULE_CACHE_PATH="$TEST_ROOT/module-cache"
 
 zsh "$ROOT/RonaldinhoPet/build-app.sh" "$ROOT/RonaldinhoPet/spritesheet.webp" >/dev/null
+if rg -q 'let expanded = panel\.frame\.height >' "$ROOT/RonaldinhoPet/main.swift"; then
+  echo "Panel expansion must not be inferred from rounded window geometry." >&2
+  exit 1
+fi
 HELPER="$RONALDINHO_BUILD_ROOT/RonaldinhoPet.app/Contents/Resources/RonaldinhoPetState"
 KING_ANIMATIONS="$RONALDINHO_BUILD_ROOT/RonaldinhoPet.app/Contents/Resources/pets/king-23/animations"
 test "$(find "$KING_ANIMATIONS" -type f -name '*.png' | wc -l | tr -d ' ')" = 9

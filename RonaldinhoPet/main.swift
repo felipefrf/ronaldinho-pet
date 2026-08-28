@@ -197,7 +197,8 @@ private final class PetView: NSView {
     }
 
     private var displayedState: String {
-        interactionState ?? state
+        let value = interactionState ?? state
+        return value == "running" && spriteSheet != nil ? "idle" : value
     }
 
     private var statusAreaHeight: CGFloat {
@@ -685,6 +686,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let companionDirectory = PetStore.rootURL()
     private var panel: NSPanel?
     private var globalScrollMonitor: Any?
+    private var statusExpanded = false
     private lazy var connectionsWindow = ConnectionsWindowController()
     private var petScale: CGFloat {
         let stored = UserDefaults.standard.double(forKey: "petScale")
@@ -726,6 +728,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         panel.orderFrontRegardless()
         self.panel = panel
+        setStatusPanelExpanded(statusExpanded)
         globalScrollMonitor = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self, weak panel] event in
             guard let self, let panel, panel.frame.contains(NSEvent.mouseLocation), event.scrollingDeltaY != 0 else { return }
             self.setPetScale(
@@ -750,6 +753,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setStatusPanelExpanded(_ expanded: Bool) {
+        statusExpanded = expanded
         guard let panel else { return }
         let targetHeight = panelSize(statusExpanded: expanded).height
         guard panel.frame.height != targetHeight else { return }
@@ -791,21 +795,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func resetPosition() {
-        let expanded = panel.map { $0.frame.height > panelSize(statusExpanded: false).height } ?? false
-        panel?.setFrame(initialFrame(statusExpanded: expanded), display: true, animate: false)
+        panel?.setFrame(initialFrame(statusExpanded: statusExpanded), display: true, animate: false)
     }
 
     private func setPetScale(_ proposedScale: CGFloat, anchoredAt anchor: NSPoint? = nil) {
         guard let panel else { return }
         let scale = clampedPetScale(proposedScale)
-        let expanded = panel.frame.height > 260 * petScale + 26
         let oldFrame = panel.frame
         UserDefaults.standard.set(Double(scale), forKey: "petScale")
         let anchor = anchor ?? NSPoint(x: oldFrame.maxX, y: oldFrame.maxY)
         let relativeX = (anchor.x - oldFrame.minX) / oldFrame.width
         let relativeY = (anchor.y - oldFrame.minY) / oldFrame.height
         var frame = oldFrame
-        frame.size = panelSize(statusExpanded: expanded)
+        frame.size = panelSize(statusExpanded: statusExpanded)
         frame.origin = NSPoint(
             x: anchor.x - relativeX * frame.width,
             y: anchor.y - relativeY * frame.height
