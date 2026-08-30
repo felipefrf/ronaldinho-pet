@@ -18,6 +18,13 @@ if rg -q 'let expanded = panel\.frame\.height >' "$ROOT/RonaldinhoPet/main.swift
 fi
 HELPER="$RONALDINHO_BUILD_ROOT/RonaldinhoPet.app/Contents/Resources/RonaldinhoPetState"
 KING_ANIMATIONS="$RONALDINHO_BUILD_ROOT/RonaldinhoPet.app/Contents/Resources/pets/king-23/animations"
+CREATOR_SKILL="$ROOT/codex-skill/create-editable-pet"
+python3 "$CREATOR_SKILL/scripts/pet_pack.py" validate "$ROOT/pets/king-23"
+PACK_REPO="$TEST_ROOT/pack repo"
+mkdir -p "$PACK_REPO/pets" "$PACK_REPO/RonaldinhoPet"
+touch "$PACK_REPO/RonaldinhoPet/main.swift"
+python3 "$CREATOR_SKILL/scripts/pet_pack.py" scaffold "$PACK_REPO" sample-pet "Sample Pet" >/dev/null
+grep -q '"displayName": "Sample Pet"' "$PACK_REPO/pets/sample-pet/pet.json"
 test "$(find "$KING_ANIMATIONS" -type f -name '*.png' | wc -l | tr -d ' ')" = 9
 for animation in "$KING_ANIMATIONS"/*.png; do
   sips -g hasAlpha "$animation" | grep -q 'hasAlpha: yes'
@@ -135,7 +142,9 @@ printf '%s\n' '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"keep-cla
 printf '%s\n' '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"keep-codex"}]}]}}' > "$PUBLIC_HOME/.codex/hooks.json"
 HOME="$PUBLIC_HOME" RONALDINHO_CONFIG_HOME="$PUBLIC_HOME" RONALDINHO_SKIP_HOST_CHECK=true RONALDINHO_SKIP_LAUNCH=true zsh "$ROOT/install.sh" >/dev/null
 test -f "$PUBLIC_HOME/.codex/skills/ronaldinho-pet/SKILL.md"
+test -f "$PUBLIC_HOME/.codex/skills/create-editable-pet/SKILL.md"
 grep -q 'name: ronaldinho-pet' "$PUBLIC_HOME/.codex/skills/ronaldinho-pet/SKILL.md"
+grep -q 'name: create-editable-pet' "$PUBLIC_HOME/.codex/skills/create-editable-pet/SKILL.md"
 PUBLIC_HASH="$(shasum -a 256 "$PUBLIC_HOME/.claude/settings.json" "$PUBLIC_HOME/.codex/hooks.json")"
 BACKUP_COUNT="$(find "$PUBLIC_HOME" -name '*.ronaldinho-backup-*' | wc -l | tr -d ' ')"
 HOME="$PUBLIC_HOME" RONALDINHO_CONFIG_HOME="$PUBLIC_HOME" RONALDINHO_SKIP_HOST_CHECK=true RONALDINHO_SKIP_LAUNCH=true zsh "$ROOT/install.sh" >/dev/null
@@ -149,6 +158,7 @@ if rg -q RonaldinhoPetState "$PUBLIC_HOME/.claude/settings.json" "$PUBLIC_HOME/.
   exit 1
 fi
 test ! -e "$PUBLIC_HOME/.codex/skills/ronaldinho-pet"
+test ! -e "$PUBLIC_HOME/.codex/skills/create-editable-pet"
 
 if rg -n '/Users/felipefrf|development/personal' "$ROOT" \
   -g '!EXECUTION_PLAN.md' -g '!test.sh' -g '!*.webp' -g '!.git/**'; then

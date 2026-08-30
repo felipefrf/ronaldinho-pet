@@ -168,6 +168,10 @@ do {
             from: resources.appendingPathComponent("codex-skill/ronaldinho-pet", isDirectory: true),
             to: codexHome.appendingPathComponent("skills/ronaldinho-pet", isDirectory: true)
         )
+        try replaceDirectory(
+            from: resources.appendingPathComponent("codex-skill/create-editable-pet", isDirectory: true),
+            to: codexHome.appendingPathComponent("skills/create-editable-pet", isDirectory: true)
+        )
     }
 } catch { fail("Unable to configure \(host.name): \(error.localizedDescription)") }
 

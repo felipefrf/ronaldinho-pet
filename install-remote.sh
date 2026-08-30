@@ -11,7 +11,7 @@ ACTION="${1:-install}"
   exit 1
 }
 
-REPOSITORY="felipefrf/ronaldinho-pet"
+REPOSITORY="felipefrf/editable-pets"
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/ronaldinho-pet-remote.XXXXXX")"
 trap 'rm -rf "$STAGE"' EXIT
 

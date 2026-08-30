@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create Editable Pet"
+  short_description: "Turn reference photos into a pet pack"
+  default_prompt: "Use $create-editable-pet to turn my reference images into an animated pet pack."

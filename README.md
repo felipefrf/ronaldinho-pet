@@ -1,6 +1,6 @@
-# Player Companions
+# Editable Pets
 
-A small macOS companion platform for Claude Code, Claude Desktop, Codex CLI,
+A small macOS companion platform, called **Player Companions**, for Claude Code, Claude Desktop, Codex CLI,
 and Codex App. Choose a player pet while native hooks keep concurrent sessions
 visible without overwriting one another.
 
@@ -9,7 +9,7 @@ visible without overwriting one another.
 ### Terminal — one command
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/felipefrf/ronaldinho-pet/main/install-remote.sh | zsh
+curl -fsSL https://raw.githubusercontent.com/felipefrf/editable-pets/main/install-remote.sh | zsh
 ```
 
 This downloads the newest GitHub release, verifies its published SHA-256, and
@@ -19,7 +19,7 @@ require Xcode.
 ### Download
 
 Download the newest `macos-universal.dmg` from
-[Releases](https://github.com/felipefrf/ronaldinho-pet/releases), open it, and
+[Releases](https://github.com/felipefrf/editable-pets/releases), open it, and
 drag **RonaldinhoPet** to **Applications**. Open it and use **Connections** to
 connect Claude and Codex. The prebuilt release works on Apple
 Silicon and Intel Macs running macOS 13 or newer; Xcode is not required.
@@ -39,8 +39,8 @@ Requirements:
 - Claude Code/Desktop and/or Codex
 
 ```sh
-git clone https://github.com/felipefrf/ronaldinho-pet.git
-cd ronaldinho-pet
+git clone https://github.com/felipefrf/editable-pets.git
+cd editable-pets
 ./install.sh
 ```
 
@@ -59,6 +59,20 @@ There are two intentional surfaces using the same sprite asset:
 Right-click the floating companion and use **Pet** to switch between
 **Ronaldinho** and the original basketball companion **King 23**.
 
+## Create a pet from photos
+
+The installer also adds the `$create-editable-pet` Codex skill. In a source
+checkout, attach one or more photos you have permission to use and ask:
+
+```text
+Use $create-editable-pet to create an original pet from these references.
+```
+
+The skill first creates a character preview for approval, then generates the
+nine transparent animation atlases under `pets/<pet-id>/`. Rebuild with
+`./install.sh`; the app discovers valid pet packs automatically. Reference
+photos stay outside the repository unless you explicitly choose otherwise.
+
 The compact bar always shows Claude and Codex independently, including active
 and finished counts. Click it to expand the fixed row for each host.
 
@@ -69,6 +83,7 @@ The installer:
 - merges its hooks without replacing existing hooks;
 - installs the native Codex pet under `~/.codex/pets/ronaldinho-gaucho`;
 - installs the `$ronaldinho-pet` skill for Codex App and CLI;
+- installs the `$create-editable-pet` skill for generating new pet packs;
 - creates timestamped configuration backups only when content changes;
 - can be run repeatedly without duplicating entries.
 
@@ -93,7 +108,7 @@ Double-click **Uninstall Ronaldinho Pet** in the downloaded release, or run
 From any terminal:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/felipefrf/ronaldinho-pet/main/install-remote.sh | zsh -s -- uninstall
+curl -fsSL https://raw.githubusercontent.com/felipefrf/editable-pets/main/install-remote.sh | zsh -s -- uninstall
 ```
 
 Owned hooks are removed exactly; unrelated settings remain. The app, state, and

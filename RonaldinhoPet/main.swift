@@ -8,16 +8,50 @@ private func clampedPetScale(_ scale: CGFloat) -> CGFloat {
     min(maximumPetScale, max(minimumPetScale, scale))
 }
 
+private struct PetManifest: Decodable {
+    let displayName: String
+    let states: [String: String]
+}
+
 private struct CompanionPet {
     let id: String
     let name: String
     let resource: String
     let animationDirectory: String?
 
-    static let all = [
-        CompanionPet(id: "ronaldinho", name: "Ronaldinho", resource: "spritesheet.webp", animationDirectory: nil),
-        CompanionPet(id: "king-23", name: "King 23", resource: "pets/king-23/animations/idle.png", animationDirectory: "pets/king-23/animations"),
+    private static let requiredStates = [
+        "idle", "running-right", "running-left", "waving", "jumping",
+        "failed", "waiting", "running", "review",
     ]
+
+    static let all: [CompanionPet] = {
+        let builtIn = CompanionPet(id: "ronaldinho", name: "Ronaldinho", resource: "spritesheet.webp", animationDirectory: nil)
+        guard let root = Bundle.main.resourceURL?.appendingPathComponent("pets", isDirectory: true),
+              let directories = try? FileManager.default.contentsOfDirectory(
+                at: root,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles]
+              ) else { return [builtIn] }
+
+        let discovered = directories.compactMap { directory -> CompanionPet? in
+            let manifestURL = directory.appendingPathComponent("pet.json")
+            guard let data = try? Data(contentsOf: manifestURL),
+                  let manifest = try? JSONDecoder().decode(PetManifest.self, from: data),
+                  !manifest.displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  requiredStates.allSatisfy({ state in
+                    manifest.states[state] == "animations/\(state).png" &&
+                    FileManager.default.fileExists(atPath: directory.appendingPathComponent("animations/\(state).png").path)
+                  }) else { return nil }
+            let id = directory.lastPathComponent
+            return CompanionPet(
+                id: id,
+                name: manifest.displayName,
+                resource: "pets/\(id)/animations/idle.png",
+                animationDirectory: "pets/\(id)/animations"
+            )
+        }
+        return [builtIn] + discovered.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }()
 
     static func pet(id: String?) -> CompanionPet { all.first { $0.id == id } ?? all[0] }
 }

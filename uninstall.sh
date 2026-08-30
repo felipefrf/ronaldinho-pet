@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 TARGET_ROOT="${HOME}/Library/Application Support/RonaldinhoPet"
 CODEX_SKILL="${CODEX_HOME:-${HOME}/.codex}/skills/ronaldinho-pet"
+CODEX_CREATOR_SKILL="${CODEX_HOME:-${HOME}/.codex}/skills/create-editable-pet"
 TEMP_CONFIGURATOR=""
 if [ -x "$TARGET_ROOT/RonaldinhoPet.app/Contents/Resources/RonaldinhoConfigureHooks" ]; then
   CONFIGURATOR="$TARGET_ROOT/RonaldinhoPet.app/Contents/Resources/RonaldinhoConfigureHooks"
@@ -36,5 +37,9 @@ fi
 if [ -d "$CODEX_SKILL" ] && diff -qr "$ROOT/codex-skill/ronaldinho-pet" "$CODEX_SKILL" >/dev/null; then
   mkdir -p "${HOME}/.Trash"
   mv "$CODEX_SKILL" "${HOME}/.Trash/ronaldinho-pet-skill-$(date +%Y%m%d-%H%M%S)"
+fi
+if [ -d "$CODEX_CREATOR_SKILL" ] && diff -qr "$ROOT/codex-skill/create-editable-pet" "$CODEX_CREATOR_SKILL" >/dev/null; then
+  mkdir -p "${HOME}/.Trash"
+  mv "$CODEX_CREATOR_SKILL" "${HOME}/.Trash/create-editable-pet-skill-$(date +%Y%m%d-%H%M%S)"
 fi
 echo "Player Companions uninstalled. Restart Claude Code/Desktop to reload hooks."

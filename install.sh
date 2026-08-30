@@ -11,6 +11,7 @@ CLAUDE_COMMAND="${HOME}/.claude/commands/pet.md"
 CODEX_HOOKS="${HOME}/.codex/hooks.json"
 CODEX_PET="${HOME}/.codex/pets/ronaldinho-gaucho"
 CODEX_SKILL="${CODEX_HOME:-${HOME}/.codex}/skills/ronaldinho-pet"
+CODEX_CREATOR_SKILL="${CODEX_HOME:-${HOME}/.codex}/skills/create-editable-pet"
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/ronaldinho-pet-install.XXXXXX")"
 COMMITTED=false
 
@@ -50,6 +51,12 @@ rollback() {
       ditto "$STAGE/previous-codex-skill" "$CODEX_SKILL"
     elif [ -e "$CODEX_SKILL" ]; then
       rm -rf "$CODEX_SKILL"
+    fi
+    if [ -e "$STAGE/previous-codex-creator-skill" ]; then
+      rm -rf "$CODEX_CREATOR_SKILL"
+      ditto "$STAGE/previous-codex-creator-skill" "$CODEX_CREATOR_SKILL"
+    elif [ -e "$CODEX_CREATOR_SKILL" ]; then
+      rm -rf "$CODEX_CREATOR_SKILL"
     fi
   fi
   rm -rf "$STAGE"
@@ -92,6 +99,7 @@ if [ -e "$CLAUDE_COMMAND" ]; then cp -p "$CLAUDE_COMMAND" "$STAGE/pet.md"; fi
 if [ -e "$CODEX_HOOKS" ]; then cp -p "$CODEX_HOOKS" "$STAGE/hooks.json"; fi
 if [ -e "$CODEX_PET" ]; then ditto "$CODEX_PET" "$STAGE/previous-codex-pet"; fi
 if [ -e "$CODEX_SKILL" ]; then ditto "$CODEX_SKILL" "$STAGE/previous-codex-skill"; fi
+if [ -e "$CODEX_CREATOR_SKILL" ]; then ditto "$CODEX_CREATOR_SKILL" "$STAGE/previous-codex-creator-skill"; fi
 
 pkill -f "$TARGET_APP/Contents/MacOS/RonaldinhoPet" 2>/dev/null || true
 mkdir -p "$TARGET_ROOT"
